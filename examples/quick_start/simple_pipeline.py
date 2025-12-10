@@ -1,20 +1,35 @@
 import argparse
+import os
+
+import dotenv
+
 from flashrag.config import Config
 from flashrag.utils import get_dataset
 from flashrag.pipeline import SequentialPipeline
 from flashrag.prompt import PromptTemplate
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--model_path", type=str)
-parser.add_argument("--retriever_path", type=str)
-args = parser.parse_args()
+
+dotenv.load_dotenv()
+openai_api_key = os.getenv("OPENAI_API_KEY")
+openai_base_url = os.getenv("OPENAI_BASE_URL")
 
 config_dict = {
     "data_dir": "dataset/",
     "index_path": "indexes/e5_Flat.index",
     "corpus_path": "indexes/general_knowledge.jsonl",
-    "model2path": {"e5": args.retriever_path, "llama3-8B-instruct": args.model_path},
-    "generator_model": "llama3-8B-instruct",
+    # 只保留 retriever 的 model2path（如果 retriever 仍是本地 e5）
+    "model2path": {"e5": "./e5-base-v2"},
+
+    # 生成器改为 OpenAI
+    "framework": "openai",  # ← 关键：指定使用 OpenAI API
+    "generator_model": "gpt-3.5-turbo",  # ← OpenAI 模型名称
+
+    # OpenAI API 设置（必须提供 api_key）
+    "openai_setting": {
+        "api_key": openai_api_key,  # 建议从环境变量读取
+        "base_url": openai_base_url,  # 默认可省略
+    },
+
     "retrieval_method": "e5",
     "metrics": ["em", "f1", "acc"],
     "retrieval_topk": 1,

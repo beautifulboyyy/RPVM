@@ -1,0 +1,61 @@
+# RPVM方法实验配置文件
+# Reflective Plan-Verify Memory for Multi-hop QA
+
+# ========== 基本设置 ==========
+data_dir: "dataset"  # FlashRAG数据目录
+save_dir: "output/rpvm_experiments"
+seed: 2024
+save_intermediate_data: True
+save_note: "rpvm_multihop_qa"
+gpu_id: "0"
+
+# ========== 数据集设置 ==========
+dataset_name: "hotpotqa"  # 或 "2wikimultihopqa"
+split: ["test"]
+
+# ========== 检索器设置 (E5) ==========
+retrieval_method: "e5"
+retrieval_model_path: "examples/quick_start/e5-base-v2"  # E5模型路径
+index_path: "indexes/e5_Flat.index"  # E5索引路径（需要构建）
+corpus_path: "indexes/general_knowledge.jsonl"  # 维基百科语料库路径（需要准备）
+retrieval_topk: 5
+retrieval_batch_size: 32
+retrieval_use_fp16: True
+use_reranker: False
+save_retrieval_cache: True
+use_retrieval_cache: False
+
+# ========== 生成器设置 (OpenAI GPT-3.5) ==========
+framework: "openai"
+generator_model: "gpt-3.5-turbo"
+openai_setting:
+  api_key: null  # 从.env文件的OPENAI_API_KEY读取
+  base_url: null  # 从.env文件的OPENAI_BASE_URL读取
+generator_max_input_len: 4096
+generator_batch_size: 1
+generation_params:
+  max_tokens: 512
+  temperature: 0.7
+  top_p: 0.9
+
+# ========== RPVM特定参数 ==========
+rpvm_config:
+  max_iter: 5  # 最大迭代次数
+  max_retrieval_attempts: 2  # 每个plan的最大检索尝试次数
+  retrieval_topk: 5  # 每次检索返回的文档数
+  memory_max_tokens: 3000  # 记忆的最大token数，超过则需要摘要
+  enable_memory_summary: True  # 是否启用记忆摘要
+  planner_temperature: 0.7  # 规划器的温度参数
+  verifier_temperature: 0.3  # 验证器的温度参数(更保守)
+  final_answer_temperature: 0.5  # 最终答案生成的温度参数
+
+# ========== 评估设置 ==========
+metrics: ["em", "f1", "acc"]
+metric_setting:
+  retrieval_recall_topk: 5
+save_metric_score: True
+
+# ========== 其他设置 ==========
+use_fid: False
+refiner_name: null
+silent_retrieval: False
