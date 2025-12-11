@@ -2,7 +2,7 @@
 # Reflective Plan-Verify Memory for Multi-hop QA
 
 # ========== 基本设置 ==========
-data_dir: "RPVM/datasets"  # 数据集目录
+data_dir: "datasets"  # 数据集目录
 save_dir: "output/rpvm_experiments"
 seed: 2024
 save_intermediate_data: True
@@ -15,9 +15,9 @@ split: ["dev"]  # 2WikiMultihopQA没有test集，使用dev集
 
 # ========== 检索器设置 (E5) ==========
 retrieval_method: "e5"
-retrieval_model_path: "RPVM/e5-base-v2"  # E5模型路径
-index_path: "RPVM/indexes/e5_Flat.index"  # E5索引路径
-corpus_path: "RPVM/indexes/domainrag_text_corpus.jsonl"  # 小语料库用于测试
+retrieval_model_path: "e5-base-v2"  # E5模型路径
+index_path: "indexes/e5_Flat.index"  # E5索引路径
+corpus_path: "indexes/domainrag_text_corpus.jsonl"  # 小语料库用于测试
 retrieval_topk: 5
 retrieval_batch_size: 32
 retrieval_use_fp16: True

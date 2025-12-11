@@ -27,15 +27,15 @@ class RPVMPipeline(BasicPipeline):
         self.generator = get_generator(config)
         
         # RPVM特定配置
-        rpvm_config = config.get('rpvm_config', {})
-        self.max_iter = rpvm_config.get('max_iter', 5)
-        self.max_retrieval_attempts = rpvm_config.get('max_retrieval_attempts', 2)
-        self.retrieval_topk = rpvm_config.get('retrieval_topk', 5)
-        self.memory_max_tokens = rpvm_config.get('memory_max_tokens', 3000)
-        self.enable_memory_summary = rpvm_config.get('enable_memory_summary', True)
-        self.planner_temperature = rpvm_config.get('planner_temperature', 0.7)
-        self.verifier_temperature = rpvm_config.get('verifier_temperature', 0.3)
-        self.final_answer_temperature = rpvm_config.get('final_answer_temperature', 0.5)
+        rpvm_config = config['rpvm_config'] if 'rpvm_config' in config else {}
+        self.max_iter = rpvm_config.get('max_iter', 5) if isinstance(rpvm_config, dict) else 5
+        self.max_retrieval_attempts = rpvm_config.get('max_retrieval_attempts', 2) if isinstance(rpvm_config, dict) else 2
+        self.retrieval_topk = rpvm_config.get('retrieval_topk', 5) if isinstance(rpvm_config, dict) else 5
+        self.memory_max_tokens = rpvm_config.get('memory_max_tokens', 3000) if isinstance(rpvm_config, dict) else 3000
+        self.enable_memory_summary = rpvm_config.get('enable_memory_summary', True) if isinstance(rpvm_config, dict) else True
+        self.planner_temperature = rpvm_config.get('planner_temperature', 0.7) if isinstance(rpvm_config, dict) else 0.7
+        self.verifier_temperature = rpvm_config.get('verifier_temperature', 0.3) if isinstance(rpvm_config, dict) else 0.3
+        self.final_answer_temperature = rpvm_config.get('final_answer_temperature', 0.5) if isinstance(rpvm_config, dict) else 0.5
         
         # 用于记录中间数据
         self.intermediate_data = []
@@ -260,7 +260,7 @@ Your response:"""
         # 尝试检索相关文档
         for attempt in range(self.max_retrieval_attempts):
             # 检索
-            retrieved_docs = self.retriever.batch_search([current_query], topk=self.retrieval_topk)
+            retrieved_docs = self.retriever.batch_search([current_query], num=self.retrieval_topk)
             retrievals_count += 1
             
             if retrieved_docs and retrieved_docs[0]:
