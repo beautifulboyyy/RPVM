@@ -48,7 +48,7 @@ class Manager:
         r"""
         Gets element by id.
 
-        Example: top.lang, train.dataset
+        Example: top.lang, train.datasets
         """
         return self._id_to_elem[elem_id]
 

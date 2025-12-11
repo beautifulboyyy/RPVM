@@ -163,7 +163,7 @@ class ConditionalPipeline(BasicPipeline):
         judge_result = self.judger.judge(dataset)
         dataset.update_output("judge_result", judge_result)
 
-        # split dataset based on judge_result
+        # split datasets based on judge_result
         dataset_split = split_dataset(dataset, judge_result)
         pos_dataset, neg_dataset = dataset_split[True], dataset_split[False]
 
@@ -233,7 +233,7 @@ class AdaptivePipeline(BasicPipeline):
         judge_result = self.judger.judge(dataset)
         dataset.update_output("judge_result", judge_result)
 
-        # split dataset based on judge_result
+        # split datasets based on judge_result
         dataset_split = split_dataset(dataset, judge_result)
         for symbol, symbol_dataset in dataset_split.items():
             if symbol == "A":

@@ -399,7 +399,7 @@ class O2SearcherPipeline(ReasoningPipeline):
         self.stop_tokens = ["</search>\n", "</search>", "</search>\n\n", "</answer>", "</answer>\n", "</answer>\n\n", "></search"]
         
     def run(self, dataset, do_eval=True, pred_process_fun=None):
-        # prompts = [self.prompt_template.get_string(question=question) for question in dataset.question]
+        # prompts = [self.prompt_template.get_string(question=question) for question in datasets.question]
         messagess = [[{'role':'system','content':self.system_prompt},{'role':'user','content':self.user_prompt.format(question=question)}] for question in dataset.question]
         prompts = [self.prompt_template.get_string(messages=messages) for messages in messagess]
         dataset.update_output('messages',messagess)
@@ -461,7 +461,7 @@ class O2SearcherPipeline(ReasoningPipeline):
                 
             # do retrieval and add retrieved docs to prompt
             if len(step_query_list) > 0:
-                # print(dataset.question)
+                # print(datasets.question)
                 _retrieved_docs = self.retriever.batch_search(sum([it['queries'] for it in step_query_list],[]))
                 retrieved_docs = []
                 doc_index = 0

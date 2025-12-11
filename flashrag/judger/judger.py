@@ -23,7 +23,7 @@ class BaseJudger:
         """Get judgement result.
 
         Args:
-            item: dataset item, contains question, retrieval result...
+            item: datasets item, contains question, retrieval result...
 
         Returns:
             judgement: bool, whether to retreive
@@ -92,7 +92,7 @@ class SKRJudger(BaseJudger):
         elif isinstance(dataset, str):
             questions = [dataset]
         else:
-            raise TypeError("dataset must be a Dataset or a list of str.")
+            raise TypeError("datasets must be a Dataset or a list of str.")
         
         all_judgements = []
         for start_idx in range(0, len(questions), self.batch_size):
@@ -153,7 +153,7 @@ class AdaptiveJudger(BaseJudger):
         elif isinstance(dataset, str):
             questions = [dataset]
         else:
-            raise TypeError("dataset must be a Dataset or a list of str.")
+            raise TypeError("datasets must be a Dataset or a list of str.")
             
         questions = [q.strip() for q in questions]
 

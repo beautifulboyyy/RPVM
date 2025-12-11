@@ -148,7 +148,7 @@ class Config:
                     config["rerank_pooling_method"] = set_pooling_method(rerank_model_name, model2pooling)
             return config
 
-        # set dataset
+        # set datasets
         dataset_name = self.final_config["dataset_name"]
         data_dir = self.final_config["data_dir"]
         self.final_config["dataset_path"] = os.path.join(data_dir, dataset_name)

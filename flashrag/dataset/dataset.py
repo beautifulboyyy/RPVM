@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional, Generator
 import numpy as np
 
 class Item:
-    """A container class used to store and manipulate a sample within a dataset.
+    """A container class used to store and manipulate a sample within a datasets.
     Information related to this sample during training/inference will be stored in `self.output`.
     Each attribute of this class can be used like a dict key (also for key in `self.output`).
     """
@@ -80,8 +80,8 @@ class Item:
 
 
 class Dataset:
-    """A container class used to store the whole dataset. Inside the class, each data sample will be stored
-    in `Item` class. The properties of the dataset represent the list of attributes corresponding to each item in the dataset.
+    """A container class used to store the whole datasets. Inside the class, each data sample will be stored
+    in `Item` class. The properties of the datasets represent the list of attributes corresponding to each item in the datasets.
     """
 
     def __init__(
@@ -148,7 +148,7 @@ class Dataset:
         return data
 
     def update_output(self, key: str, value_list: List[Any]) -> None:
-        """Update the overall output field for each sample in the dataset."""
+        """Update the overall output field for each sample in the datasets."""
         assert len(self.data) == len(value_list)
         for item, value in zip(self.data, value_list):
             item.update_output(key, value)
@@ -170,7 +170,7 @@ class Dataset:
         return [item.output for item in self.data]
 
     def get_batch_data(self, attr_name: str, batch_size: int) -> Generator[List[Any], None, None]:
-        """Get an attribute of dataset items in batch."""
+        """Get an attribute of datasets items in batch."""
         for i in range(0, len(self.data), batch_size):
             batch_items = self.data[i : i + batch_size]
             yield [item[attr_name] for item in batch_items]
@@ -180,7 +180,7 @@ class Dataset:
 
     def get_attr_data(self, attr_name: str) -> List[Any]:
         """For the attributes constructed later (not implemented using property),
-        obtain a list of this attribute in the entire dataset.
+        obtain a list of this attribute in the entire datasets.
         """
         return [item[attr_name] for item in self.data]
 
@@ -191,7 +191,7 @@ class Dataset:
         return len(self.data)
 
     def save(self, save_path: str) -> None:
-        """Save the dataset into the original format."""
+        """Save the datasets into the original format."""
 
         save_data = [item.to_dict() for item in self.data]
         with open(save_path, "w", encoding="utf-8") as f:
@@ -199,5 +199,5 @@ class Dataset:
 
 
     def __str__(self) -> str:
-        """Return a string representation of the dataset with a summary of items."""
+        """Return a string representation of the datasets with a summary of items."""
         return f"Dataset '{self.dataset_name}' with {len(self)} items"

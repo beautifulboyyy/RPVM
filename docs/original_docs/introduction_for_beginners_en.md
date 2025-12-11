@@ -87,7 +87,7 @@ Here, we directly pass the paths via a dictionary.
 from flashrag.config import Config
 
 config_dict = { 
-    'data_dir': 'dataset/',
+    'data_dir': 'datasets/',
     'index_path': 'indexes/e5_Flat.index',
     'corpus_path': 'indexes/general_knowledge.jsonl',
     'model2path': {'e5': <retriever_path>, 'llama2-7B-chat': <generator_path>},
@@ -136,7 +136,7 @@ from flashrag.utils import get_dataset
 from flashrag.pipeline import SequentialPipeline
 
 config_dict = { 
-                'data_dir': 'dataset/',
+                'data_dir': 'datasets/',
                 'index_path': 'indexes/e5_Flat.index',
                 'corpus_path': 'indexes/general_knowledge.jsonl',
                 'model2path': {'e5': <retriever_path>, 'llama2-7B-chat': <generator_path>},

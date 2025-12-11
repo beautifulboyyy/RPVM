@@ -292,7 +292,7 @@ class Runner:
             return gr.update(choices=[], value=None)
 
     def get_dataset_split(self, data_dir: str, dataset_name: str):
-        """Get the dataset split"""
+        """Get the datasets split"""
         if not (os.path.exists(data_dir) and os.path.isdir(data_dir)):
             return gr.update(choices=[], value=None)
 

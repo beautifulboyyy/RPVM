@@ -996,7 +996,7 @@ LOCALES = {
     "data_dir": {
         "en": {
             "label": "Data Directory",
-            "info": "The directory where the dataset is stored"
+            "info": "The directory where the datasets is stored"
         },
         "zh": {
             "label": "数据目录",
@@ -1046,7 +1046,7 @@ LOCALES = {
     "dataset_name": {
         "en": {
             "label": "Dataset Name",
-            "info": "The name of the dataset to be used"
+            "info": "The name of the datasets to be used"
         },
         "zh": {
             "label": "数据集名称",
@@ -1508,7 +1508,7 @@ LOCALES = {
     "dataset_split": {
         "en": {
             "label": "Dataset Split",
-            "info": "The specify dataset split used for evaluation"
+            "info": "The specify datasets split used for evaluation"
         },
         "zh": {
             "label": "数据集划分",

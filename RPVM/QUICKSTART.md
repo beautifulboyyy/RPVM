@@ -42,7 +42,7 @@ export OPENAI_API_KEY='sk-your-api-key-here'
 
 ```yaml
 # 必须修改的路径
-data_dir: "你的数据集目录"                    # 例如: "D:/flashRAG/dataset"
+data_dir: "你的数据集目录"                    # 例如: "D:/flashRAG/datasets"
 retrieval_model_path: "你的E5模型路径"        # 例如: "D:/models/e5-base-v2"
 index_path: "你的索引文件路径"                # 例如: "D:/flashRAG/indexes/e5_Flat.index"
 corpus_path: "你的语料库路径"                 # 例如: "D:/flashRAG/indexes/general_knowledge.jsonl"

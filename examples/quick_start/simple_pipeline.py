@@ -14,7 +14,7 @@ openai_api_key = os.getenv("OPENAI_API_KEY")
 openai_base_url = os.getenv("OPENAI_BASE_URL")
 
 config_dict = {
-    "data_dir": "dataset/",
+    "data_dir": "datasets/",
     "index_path": "indexes/e5_Flat.index",
     "corpus_path": "indexes/general_knowledge.jsonl",
     # 只保留 retriever 的 model2path（如果 retriever 仍是本地 e5）

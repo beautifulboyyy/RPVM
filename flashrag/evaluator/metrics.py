@@ -34,7 +34,7 @@ class BaseMetric:
         if any(choice == [] for choice in data.choices):
             golden_answers_list = data.golden_answers
         else:
-            # multi-choice dataset
+            # multi-choice datasets
             all_choices_list = data.choices
             golden_choice_idx_list = data.golden_answers
             golden_answers_list = [

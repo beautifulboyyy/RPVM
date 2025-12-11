@@ -54,7 +54,7 @@ pip install openai tiktoken  # OpenAI API支持
 
 ```yaml
 # 数据集路径
-data_dir: "dataset"  # 你的FlashRAG数据目录
+data_dir: "datasets"  # 你的FlashRAG数据目录
 
 # E5检索器
 retrieval_model_path: "intfloat/e5-base-v2"  # E5模型路径

@@ -96,12 +96,12 @@ method2index:
 
 # ------------------------------------------------Environment Settings------------------------------------------------#
 # Directory paths for data and outputs
-data_dir: "dataset/"
+data_dir: "datasets/"
 save_dir: "output/"
 
 gpu_id: "0,1,2,3"
-dataset_name: "nq" # name of the dataset in data_dir
-split: ["test"]  # dataset split to load (e.g. train,dev,test)
+dataset_name: "nq" # name of the datasets in data_dir
+split: ["test"]  # datasets split to load (e.g. train,dev,test)
 
 # Sampling configurations for testing
 test_sample_num: ~  # number of samples to test (only work in dev/test split), if None, test all samples
@@ -205,12 +205,12 @@ Here mainly manage various configurations of the experiment.
 
 ```yaml
 # Directory paths for data and outputs
-data_dir: "dataset/"
+data_dir: "datasets/"
 save_dir: "output/"
 
 gpu_id: "0,1,2,3"
-dataset_name: "nq" # name of the dataset in data_dir
-split: ["test"]  # dataset split to load (e.g. train,dev,test)
+dataset_name: "nq" # name of the datasets in data_dir
+split: ["test"]  # datasets split to load (e.g. train,dev,test)
 
 # Sampling configurations for testing
 test_sample_num: ~  # number of samples to test (only work in dev/test split), if None, test all samples

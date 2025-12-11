@@ -262,7 +262,7 @@ python -m flashrag.retriever.index_builder \
 from flashrag.config import Config
 
 # hybrid load configs
-config_dict = {'data_dir': 'dataset/'}
+config_dict = {'data_dir': 'datasets/'}
 my_config = Config(
     config_file_path = 'my_config.yaml',
     config_dict = config_dict
@@ -280,7 +280,7 @@ from flashrag.pipeline import SequentialPipeline
 from flashrag.prompt import PromptTemplate
 from flashrag.config import Config
 
-config_dict = {'data_dir': 'dataset/'}
+config_dict = {'data_dir': 'datasets/'}
 my_config = Config(
     config_file_path = 'my_config.yaml',
     config_dict = config_dict

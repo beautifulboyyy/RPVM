@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model_path", type=str)
 args = parser.parse_args()
 config_dict = {
-    "data_dir": "dataset/",
+    "data_dir": "datasets/",
     "model2path": {"llama3-8B-instruct": args.model_path},
     "generator_model": "llama3-8B-instruct",
     "retrieval_method": "e5",

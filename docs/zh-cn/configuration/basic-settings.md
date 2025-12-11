@@ -27,7 +27,7 @@ generator_model: 'llama2-7B'
 
 ```yaml
 # 数据集加载路径以及实验保存路径
-data_dir: "dataset/"
+data_dir: "datasets/"
 save_dir: "output/"
 
 gpu_id: "0,1,2,3"

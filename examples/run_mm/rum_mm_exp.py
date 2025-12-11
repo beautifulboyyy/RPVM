@@ -56,7 +56,7 @@ def mathvista(args):
     else:
         base_prompt_template = MathVistaPromptTemplate(config)
         pipeline = MMSequentialPipeline(config, prompt_template=base_prompt_template)
-        # dataset = pipeline.run(dataset, perform_modality_dict={'text': ['text']})
+        # datasets = pipeline.run(datasets, perform_modality_dict={'text': ['text']})
         dataset = pipeline.run(dataset)
 
 
@@ -114,7 +114,7 @@ def gaokao_mm(args):
         # base_prompt_template = NewPromptTemplate(config)
         base_prompt_template = GAOKAOMMPromptTemplate(config)
         pipeline = MMSequentialPipeline(config, prompt_template=base_prompt_template)
-        # dataset = pipeline.run(dataset, pred_process_func=gaokaomm_pred_parse)
+        # datasets = pipeline.run(datasets, pred_process_func=gaokaomm_pred_parse)
         dataset = pipeline.run(dataset, pred_process_func=gaokaomm_pred_parse,perform_modality_dict={'text': ['text']})
         
     
@@ -173,7 +173,7 @@ def mmqa(args):
     else:
         base_prompt_template = MMPromptTemplate(config)
         pipeline = MMSequentialPipeline(config, prompt_template=base_prompt_template)
-        # dataset = pipeline.run(dataset, perform_modality_dict={'text': ['text']})
+        # datasets = pipeline.run(datasets, perform_modality_dict={'text': ['text']})
         dataset = pipeline.run(dataset)
     
 if __name__ == "__main__":

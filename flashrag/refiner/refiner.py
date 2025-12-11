@@ -20,7 +20,7 @@ class BaseRefiner:
         r"""Get refining result.
 
         Args:
-            item: dataset item, contains question, retrieval result...
+            item: datasets item, contains question, retrieval result...
 
         Returns:
             str: refining result of this item

@@ -617,12 +617,12 @@ class SelfRAGPipeline(BasicPipeline):
     def run(self, dataset, do_eval=True, pred_process_fun=None, long_form=False):
         run_func = self.run_batch_pred_long_form if long_form else self.run_batch_pred
         
-        # # to avoid oom, split the total dataset into small batches
+        # # to avoid oom, split the total datasets into small batches
         # all_dataset_list = []
-        # for batch_dataset in tqdm(get_batch_dataset(dataset, batch_size=batch_size), desc="Batch dataset: "):
+        # for batch_dataset in tqdm(get_batch_dataset(datasets, batch_size=batch_size), desc="Batch datasets: "):
         #     batch_dataset = run_func(batch_dataset)
         #     all_dataset_list.append(batch_dataset)
-        # dataset = merge_batch_dataset(all_dataset_list)
+        # datasets = merge_batch_dataset(all_dataset_list)
 
         dataset = run_func(dataset)
         dataset = self.evaluate(dataset, do_eval=do_eval, pred_process_fun=pred_process_fun)

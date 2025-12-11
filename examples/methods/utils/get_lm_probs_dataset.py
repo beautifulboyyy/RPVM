@@ -1,4 +1,4 @@
-# This file is used for generating LM supervised dataset to finetune retrievers
+# This file is used for generating LM supervised datasets to finetune retrievers
 # Implementation details are learned from REPLUG:https://arxiv.org/abs/2301.12652
 import json
 import random
@@ -51,7 +51,7 @@ class LMProbCalculator:
 
 
 def main(
-    dataset_name="nq",  # qa dataset
+    dataset_name="nq",  # qa datasets
     split="test",  # split
     num=4000,  # number of query-document pairs
     gpu_id="0",

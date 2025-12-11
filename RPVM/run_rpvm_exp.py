@@ -68,7 +68,7 @@ def run_rpvm_experiment(args):
     config = Config(config_file_path=config_file_path, config_dict=config_dict)
     
     # 加载数据集
-    print(f"Loading dataset: {args.dataset_name}, split: {args.split}")
+    print(f"Loading datasets: {args.dataset_name}, split: {args.split}")
     all_split = get_dataset(config)
     test_data = all_split[args.split]
     

@@ -5,4 +5,6 @@ build/
 .idea/
 dist/*
 upload_pypi.sh
-tests/*
+RPVM/datasets/
+RPVM/e5-base-v2/
+RPVM/indexes/

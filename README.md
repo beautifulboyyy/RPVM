@@ -305,7 +305,7 @@ Please note that **variables as input take precedence over files**.
 from flashrag.config import Config
 
 # hybrid load configs
-config_dict = {'data_dir': 'dataset/'}
+config_dict = {'data_dir': 'datasets/'}
 my_config = Config(
     config_file_path = 'my_config.yaml',
     config_dict = config_dict
@@ -322,7 +322,7 @@ from flashrag.pipeline import SequentialPipeline
 from flashrag.prompt import PromptTemplate
 from flashrag.config import Config
 
-config_dict = {'data_dir': 'dataset/'}
+config_dict = {'data_dir': 'datasets/'}
 my_config = Config(
     config_file_path = 'my_config.yaml',
     config_dict = config_dict
@@ -373,7 +373,7 @@ class ToyPipeline(BasicPipeline):
   def run(self, dataset, do_eval=True):
     # Complete your own process logic
 
-    # get attribute in dataset using `.`
+    # get attribute in datasets using `.`
     input_query = dataset.question
     ...
     # use `update_output` to save intermeidate data

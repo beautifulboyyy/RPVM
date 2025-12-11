@@ -7,7 +7,7 @@ from flashrag.dataset.dataset import Dataset
 import torch
 
 def get_dataset(config):
-    """Load dataset from config."""
+    """Load datasets from config."""
     SUPPORT_FILES = ["jsonl", "json", "parquet"]
 
     dataset_path = config["dataset_path"]
@@ -27,7 +27,7 @@ def get_dataset(config):
         if exist_flag == 0:
             continue
         else:
-            print(f"Loading {split} dataset from: {split_path}...")
+            print(f"Loading {split} datasets from: {split_path}...")
         if split in ["test", "val", "dev", "train"]:
             split_dict[split] = Dataset(
                 config, split_path, sample_num=config["test_sample_num"], random_sample=config["random_sample"]
