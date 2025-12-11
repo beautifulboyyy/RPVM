@@ -8,3 +8,4 @@ upload_pypi.sh
 RPVM/datasets/
 RPVM/e5-base-v2/
 RPVM/indexes/
+.env
