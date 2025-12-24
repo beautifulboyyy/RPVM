@@ -8,4 +8,5 @@ upload_pypi.sh
 RPVM/datasets/
 RPVM/e5-base-v2/
 RPVM/indexes/
+RPVM/qwen3-8b/
 .env
