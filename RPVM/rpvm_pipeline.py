@@ -2,7 +2,7 @@
 RPVM Pipeline Implementation
 Reflective Plan-Verify Memory for Multi-hop QA
 
-基于FlashRAG框架实现RPVM方法
+Based on FlashRAG framework implement RPVM method
 """
 import json
 import re
@@ -11,6 +11,7 @@ from tqdm import tqdm
 from flashrag.pipeline import BasicPipeline
 from flashrag.utils import get_retriever, get_generator
 from flashrag.prompt import PromptTemplate
+from prompt_loader import PromptLoader
 
 
 class RPVMPipeline(BasicPipeline):
@@ -26,6 +27,9 @@ class RPVMPipeline(BasicPipeline):
         self.retriever = get_retriever(config)
         self.generator = get_generator(config)
         
+        # 判断是否使用OpenAI框架
+        self.use_openai = config['framework'] == 'openai' if 'framework' in config else False
+        
         # RPVM特定配置
         rpvm_config = config['rpvm_config'] if 'rpvm_config' in config else {}
         self.max_iter = rpvm_config.get('max_iter', 5) if isinstance(rpvm_config, dict) else 5
@@ -37,8 +41,43 @@ class RPVMPipeline(BasicPipeline):
         self.verifier_temperature = rpvm_config.get('verifier_temperature', 0.3) if isinstance(rpvm_config, dict) else 0.3
         self.final_answer_temperature = rpvm_config.get('final_answer_temperature', 0.5) if isinstance(rpvm_config, dict) else 0.5
         
+        # 初始化Prompt Loader
+        self.prompt_loader = PromptLoader()
+        
         # 用于记录中间数据
         self.intermediate_data = []
+    
+    def _call_generator(self, system_prompt: str, user_prompt: str, temperature: float = 0.7, max_tokens: int = 512) -> str:
+        """
+        统一的生成器调用接口，支持 OpenAI 和本地 HF 模型
+        """
+        if self.use_openai:
+            # OpenAI 格式：消息列表
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+            response = self.generator.generate(
+                [messages],
+                temperature=temperature,
+                max_tokens=max_tokens
+            )[0]
+        else:
+            # 本地 HF 模型格式：构建完整 prompt 字符串
+            # 使用 Qwen 格式的 chat template
+            full_prompt = f"""<|im_start|>system
+{system_prompt}<|im_end|>
+<|im_start|>user
+{user_prompt}<|im_end|>
+<|im_start|>assistant
+"""
+            response = self.generator.generate(
+                [full_prompt],
+                temperature=temperature,
+                max_new_tokens=max_tokens
+            )[0]
+        
+        return response.strip()
 
     def run(self, dataset, do_eval=True, pred_process_fun=None):
         """
@@ -163,85 +202,70 @@ class RPVMPipeline(BasicPipeline):
 
     def _planner(self, question: str, memory: str) -> any:
         """
-        Reflective Planner: 基于问题和当前记忆生成推理计划链
+        Reflective Planner: 基于问题和当前记忆生成推理计划链（假设生成模式）
         
         Returns:
             "ANSWER_READY" 或 计划列表 [plan1, plan2, ...]
         """
-        planner_prompt = self._build_planner_prompt(question, memory)
+        system_prompt, user_prompt = self.prompt_loader.get_planner_prompt(question, memory)
         
-        # 使用OpenAI生成器
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant that plans reasoning chains for answering complex multi-hop questions."},
-            {"role": "user", "content": planner_prompt}
-        ]
-        
-        response = self.generator.generate(
-            [messages],
+        response = self._call_generator(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
             temperature=self.planner_temperature,
             max_tokens=512
-        )[0]
+        )
         
-        # 解析响应
         response = response.strip()
         if "ANSWER_READY" in response:
             return "ANSWER_READY"
         
-        # 解析计划列表
         plans = self._parse_plans(response)
         return plans
 
-    def _build_planner_prompt(self, question: str, memory: str) -> str:
-        """构建Planner的prompt"""
-        if memory.strip():
-            prompt = f"""Given the question and the verified memory so far, determine the next reasoning steps needed.
-
-Question: {question}
-
-Verified Memory:
-{memory}
-
-Instructions:
-1. If the memory contains enough information to answer the question, respond with exactly: ANSWER_READY
-2. Otherwise, generate a logical reasoning chain as a numbered list of plans. Each plan should be a verifiable statement.
-3. Format: List each plan on a new line starting with a number, e.g.:
-   1. [First reasoning step]
-   2. [Second reasoning step]
-
-Your response:"""
-        else:
-            prompt = f"""Given the question, generate a logical reasoning chain to answer it.
-
-Question: {question}
-
-Instructions:
-Generate a logical reasoning chain as a numbered list of plans. Each plan should be a verifiable statement that helps answer the question.
-
-Format: List each plan on a new line starting with a number, e.g.:
-1. [First reasoning step]
-2. [Second reasoning step]
-
-Your response:"""
-        
-        return prompt
-
     def _parse_plans(self, response: str) -> List[str]:
-        """从LLM响应中解析计划列表"""
+        """从LLM响应中解析计划列表，支持多种格式"""
         plans = []
         lines = response.strip().split('\n')
         
         for line in lines:
             line = line.strip()
+            # 跳过空行和无关内容
+            if not line or line.startswith('#') or line.startswith('['):
+                continue
+            
+            # 匹配 "plan1: xxx" 格式（推荐格式）
+            match = re.match(r'^plan\d+[:\s]+(.+)$', line, re.IGNORECASE)
+            if match:
+                plan_text = match.group(1).strip()
+                if plan_text:
+                    plans.append(plan_text)
+                continue
+            
             # 匹配 "1. xxx" 或 "1) xxx" 格式
-            match = re.match(r'^(\d+)[\.\)]\s*(.+)$', line)
+            match = re.match(r'^(\d+)[\.\)\s]+(.+)$', line)
             if match:
                 plan_text = match.group(2).strip()
                 if plan_text:
                     plans.append(plan_text)
+                continue
+            
+            # 匹配以 "- " 开头的列表格式
+            match = re.match(r'^-\s+(.+)$', line)
+            if match:
+                plan_text = match.group(1).strip()
+                if plan_text:
+                    plans.append(plan_text)
         
-        # 如果没有解析到计划，尝试直接按行分割
+        # 如果没有解析到计划，尝试直接按行分割（过滤掉明显无效的行）
         if not plans and response.strip():
-            plans = [line.strip() for line in lines if line.strip() and not line.strip().startswith('#')]
+            for line in lines:
+                line = line.strip()
+                # 过滤掉思考标签和命令式语句
+                if line and not line.startswith('#') and not line.startswith('[') and not line.startswith('<'):
+                    # 过滤掉以命令动词开头的行
+                    if not re.match(r'^(Find|Search|Check|Identify|Look|Determine|Compare)\s', line, re.IGNORECASE):
+                        plans.append(line)
         
         return plans if plans else ["Unable to parse plans, using original response"]
 
@@ -282,24 +306,14 @@ Your response:"""
 
     def _rewrite_query(self, plan: str, attempt: int) -> str:
         """改写检索查询以提高召回"""
-        rewrite_prompt = f"""Rewrite the following statement into a more specific search query to find relevant documents.
-
-Original statement: {plan}
-
-Attempt {attempt}: Generate a different, more specific search query focusing on key entities and relationships.
-
-Rewritten query:"""
+        system_prompt, user_prompt = self.prompt_loader.get_query_rewriter_prompt(plan, attempt)
         
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant that rewrites queries for better document retrieval."},
-            {"role": "user", "content": rewrite_prompt}
-        ]
-        
-        rewritten = self.generator.generate(
-            [messages],
+        rewritten = self._call_generator(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
             temperature=0.5,
             max_tokens=100
-        )[0]
+        )
         
         return rewritten.strip() if rewritten.strip() else plan
 
@@ -310,47 +324,20 @@ Rewritten query:"""
         Returns:
             (verdict, corrected_plan, evidence)
         """
-        # 构建验证prompt
         docs_text = "\n\n".join([
             f"Document {i+1}: {doc.get('contents', doc.get('text', ''))}"
-            for i, doc in enumerate(docs[:5])  # 只使用前5个文档
+            for i, doc in enumerate(docs[:5])
         ])
         
-        verify_prompt = f"""Based on the retrieved documents, verify the following statement.
-
-Statement to verify: {plan}
-
-Retrieved Documents:
-{docs_text}
-
-Instructions:
-1. Determine if the statement is:
-   - SUPPORTED: The documents provide evidence supporting this statement
-   - CONTRADICTED: The documents contradict this statement
-   - INSUFFICIENT: The documents don't provide enough information
-
-2. If CONTRADICTED, provide the corrected version based on the documents.
-3. If SUPPORTED or INSUFFICIENT, keep the original statement.
-
-Respond in this exact format:
-Verdict: [SUPPORTED/CONTRADICTED/INSUFFICIENT]
-Corrected Statement: [the statement, corrected if needed]
-Evidence: [brief explanation]
-
-Your response:"""
+        system_prompt, user_prompt = self.prompt_loader.get_verifier_prompt(plan, docs_text)
         
-        messages = [
-            {"role": "system", "content": "You are a careful fact-checker that verifies statements against documents."},
-            {"role": "user", "content": verify_prompt}
-        ]
-        
-        response = self.generator.generate(
-            [messages],
+        response = self._call_generator(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
             temperature=self.verifier_temperature,
             max_tokens=300
-        )[0]
+        )
         
-        # 解析验证结果
         verdict, corrected_plan, evidence = self._parse_verification_response(response, plan)
         
         return verdict, corrected_plan, evidence
@@ -381,28 +368,17 @@ Your response:"""
 
     def _check_and_summarize_memory(self, memory: str) -> str:
         """检查记忆长度，如有必要进行摘要"""
-        # 简单估计token数(英文约为单词数的1.3倍)
         estimated_tokens = len(memory.split()) * 1.3
         
         if estimated_tokens > self.memory_max_tokens:
-            # 进行摘要
-            summary_prompt = f"""Summarize the following verified facts into a concise memory, preserving all key information.
-
-Memory to summarize:
-{memory}
-
-Provide a concise summary that retains all important facts:"""
+            system_prompt, user_prompt = self.prompt_loader.get_memory_summarizer_prompt(memory)
             
-            messages = [
-                {"role": "system", "content": "You are a helpful assistant that summarizes information concisely."},
-                {"role": "user", "content": summary_prompt}
-            ]
-            
-            summarized = self.generator.generate(
-                [messages],
+            summarized = self._call_generator(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
                 temperature=0.3,
                 max_tokens=500
-            )[0]
+            )
             
             return summarized.strip()
         
@@ -410,57 +386,27 @@ Provide a concise summary that retains all important facts:"""
 
     def _generate_final_answer(self, question: str, memory: str) -> str:
         """基于记忆生成最终答案"""
-        answer_prompt = f"""Based on the verified facts in memory, answer the question directly and concisely.
-
-Question: {question}
-
-Verified Memory:
-{memory}
-
-Provide a direct, concise answer to the question:"""
+        system_prompt, user_prompt = self.prompt_loader.get_final_answer_prompt(question, memory)
         
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant that provides direct, accurate answers based on verified information."},
-            {"role": "user", "content": answer_prompt}
-        ]
-        
-        answer = self.generator.generate(
-            [messages],
+        answer = self._call_generator(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
             temperature=self.final_answer_temperature,
             max_tokens=200
-        )[0]
+        )
         
         return answer.strip()
 
     def _generate_best_effort_answer(self, question: str, memory: str) -> str:
         """在达到最大迭代次数时生成尽力回答"""
-        if not memory.strip():
-            # 如果没有记忆，直接用模型知识回答
-            answer_prompt = f"""Answer the following question based on your knowledge. Be honest if you're uncertain.
-
-Question: {question}
-
-Answer:"""
-        else:
-            answer_prompt = f"""Based on the available verified facts (though incomplete), provide your best answer to the question. Acknowledge if information is incomplete.
-
-Question: {question}
-
-Verified Memory:
-{memory}
-
-Best effort answer:"""
+        system_prompt, user_prompt = self.prompt_loader.get_best_effort_answer_prompt(question, memory)
         
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant. Provide the best answer you can, and be honest about uncertainty."},
-            {"role": "user", "content": answer_prompt}
-        ]
-        
-        answer = self.generator.generate(
-            [messages],
+        answer = self._call_generator(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
             temperature=self.final_answer_temperature,
             max_tokens=200
-        )[0]
+        )
         
         return answer.strip()
 

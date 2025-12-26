@@ -1,0 +1,60 @@
+# RPVM方法本地实验配置文件
+# 使用 wiki18 小语料库 + qwen3-8b 本地模型
+
+# ========== 基本设置 ==========
+data_dir: "datasets"  # 数据集目录
+save_dir: "output/rpvm_local_experiments"
+seed: 2024
+save_intermediate_data: True
+save_note: "rpvm_local_qwen3"
+gpu_id: "1"
+
+# ========== 数据集设置 ==========
+dataset_name: "2wikimultihopqa"
+split: ["dev"]  # 使用dev集
+
+# ========== 检索器设置 (E5) ==========
+retrieval_method: "e5"
+retrieval_model_path: "e5-base-v2"  # E5模型路径（本地）
+index_path: "indexes/wiki18_small_index/e5_Flat.index"  # 小语料库索引
+corpus_path: "indexes/wiki18_small_corpus.jsonl"  # 小语料库
+retrieval_topk: 1
+retrieval_batch_size: 32
+retrieval_use_fp16: True
+use_reranker: False
+save_retrieval_cache: True
+use_retrieval_cache: False
+
+# ========== 生成器设置 (本地 Qwen3-8B) ==========
+framework: "hf"  # 使用 HuggingFace 加载本地模型
+generator_model: "qwen3-8b"  # 模型名称
+generator_model_path: "qwen3-8b"  # 本地模型路径
+generator_max_input_len: 4096
+generator_batch_size: 1
+generation_params:
+  max_new_tokens: 512
+  temperature: 0.7
+  top_p: 0.9
+  do_sample: true
+
+# ========== RPVM特定参数 ==========
+rpvm_config:
+  max_iter: 2  # 最大迭代次数
+  max_retrieval_attempts: 1  # 每个plan的最大检索尝试次数
+  retrieval_topk: 1  # 每次检索返回的文档数
+  memory_max_tokens: 3000  # 记忆的最大token数
+  enable_memory_summary: True  # 是否启用记忆摘要
+  planner_temperature: 0.3  # 规划器的温度参数，降低以减少发散性废话
+  verifier_temperature: 0.3  # 验证器的温度参数
+  final_answer_temperature: 0.5  # 最终答案生成的温度参数
+
+# ========== 评估设置 ==========
+metrics: ["em", "f1", "acc"]
+metric_setting:
+  retrieval_recall_topk: 5
+save_metric_score: True
+
+# ========== 其他设置 ==========
+use_fid: False
+refiner_name: null
+silent_retrieval: False
