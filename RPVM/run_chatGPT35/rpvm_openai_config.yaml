@@ -47,7 +47,7 @@ rpvm_config:
   final_answer_temperature: 0.5  # 最终答案生成的温度参数
 
 # ========== 评估设置 ==========
-metrics: ["em", "f1", "acc"]
+metrics: ["f1", "acc"]
 metric_setting:
   retrieval_recall_topk: 5
 save_metric_score: True

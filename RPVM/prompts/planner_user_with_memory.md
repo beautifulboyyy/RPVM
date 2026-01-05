@@ -2,13 +2,14 @@
 
 User Question: {question}
 
-Memory (verified facts so far):
+Current Memory (Already Known/Verified):
 {memory}
 
 Instructions:
-- If the memory contains enough information to answer the question, respond with exactly: ANSWER_READY
-- Otherwise, generate factual assertions (hypotheses) that would help answer the question.
-- Use format: plan1: [declarative statement], plan2: [declarative statement], etc.
-- DO NOT use imperative verbs. Make factual assertions only.
+- Analyze the Memory first. If the Memory already contains all the necessary facts to answer the question, respond ONLY with: ANSWER_READY.
+- Otherwise, identify the MISSING LINK between the current Memory and the final answer.
+- Generate ONLY new factual assertions (hypotheses) to bridge this gap.
+- DO NOT re-generate or re-verify facts already in the Memory.
+- Use format: plan1: [statement], plan2: [statement].
 
-Output your plans now:
+Output your new plans now:
