@@ -5,10 +5,10 @@
 cd "$(dirname "$0")"
 
 # 激活conda环境（如果需要）
-# conda activate lsw_rpvm
+ conda activate lsw_rpvm
 
 # 设置环境变量
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 
 # 运行实验
 python ./run_chatGPT35/run_openai_experiment.py \

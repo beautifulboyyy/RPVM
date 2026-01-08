@@ -16,8 +16,8 @@ split: ["dev"]  # 使用dev集
 # ========== 检索器设置 (E5) ==========
 retrieval_method: "e5"
 retrieval_model_path: "e5-base-v2"  # E5模型路径（本地）
-index_path: "indexes/wiki18_small_index/e5_Flat.index"  # 小语料库索引
-corpus_path: "indexes/wiki18_small_corpus.jsonl"  # 小语料库
+index_path: "indexes/wiki18_100w_index_sq8/e5_SQ8.index"
+corpus_path: "indexes/wiki18_100w.jsonl"
 retrieval_topk: 1
 retrieval_batch_size: 32
 retrieval_use_fp16: True

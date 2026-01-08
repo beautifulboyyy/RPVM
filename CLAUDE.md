@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 FlashRAG is a Python toolkit for Retrieval Augmented Generation (RAG) research. It includes 36 benchmark datasets and 23 RAG algorithms (including 7 reasoning-based methods). The repository also contains a custom RPVM (Reflective Plan-Verify Memory) implementation for multi-hop QA.
 
-**Python:** >= 3.9
+**Python:** >= 3.10
 
 ## Installation
 
@@ -55,6 +55,59 @@ python -m flashrag.retriever.index_builder \
 ```bash
 python webui/interface.py
 ```
+
+### Linting
+
+```bash
+ruff check flashrag/ RPVM/
+ruff check --fix flashrag/ RPVM/  # Auto-fix trailing whitespace
+```
+
+### Running Tests
+
+```bash
+# RPVM module tests
+python RPVM/test_rpvm.py
+
+# No unified pytest framework - individual test files exist
+```
+
+### Quick Example
+
+```python
+from flashrag.config import Config
+from flashrag.utils import get_dataset
+from flashrag.pipeline import SequentialPipeline
+
+config = Config("my_config.yaml", config_dict={"gpu_id": 0, "dataset_name": "hotpotqa"})
+dataset = get_dataset(config)["test"]
+pipeline = SequentialPipeline(config)
+result = pipeline.run(dataset)
+```
+
+### Key Entry Points
+
+| File | Purpose |
+|------|---------|
+| `examples/methods/run_exp.py` | Run standard RAG experiments (naive, zero-shot, aar, etc.) |
+| `RPVM/run_rpvm_exp.py` | Run RPVM multi-hop QA experiments |
+| `examples/quick_start/demo_en.py` | Basic usage demo |
+| `webui/interface.py` | Web UI launcher |
+
+### Component Factory Functions
+
+Use factory functions to load components:
+- `get_retriever(config)` - Load retriever based on `retrieval_method`
+- `get_generator(config)` - Load generator based on `framework`
+- `get_refiner(config)` - Load refiner based on `refiner_name`
+- `get_dataset(config)` - Load dataset from `data_dir`
+
+### Configuration Pattern
+
+All examples use `my_config.yaml` as a base config file with runtime overrides via `config_dict`:
+- Base config: `my_config.yaml` in the same directory as the script
+- Runtime overrides passed as dict: `Config("my_config.yaml", config_dict={"gpu_id": 0})`
+- See `flashrag/config/basic_config.yaml` for all available options
 
 ## Architecture
 
