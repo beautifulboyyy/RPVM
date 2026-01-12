@@ -7,13 +7,29 @@ from typing import Dict
 
 class PromptLoader:
     """从prompts目录加载所有prompt模板"""
-    
+
     def __init__(self, prompts_dir: str = None):
+        """
+        初始化PromptLoader
+
+        Args:
+            prompts_dir: prompt文件目录路径。
+                        如果指定了model_name参数，则使用 prompts/{model_name} 目录。
+                        如果直接指定prompts_dir，则使用该目录。
+        """
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        prompts_base_dir = os.path.join(current_dir, 'prompts')
+
         if prompts_dir is None:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            prompts_dir = os.path.join(current_dir, 'prompts')
-        
-        self.prompts_dir = prompts_dir
+            # 默认使用openai的prompts
+            self.prompts_dir = os.path.join(prompts_base_dir, 'openai')
+        elif os.path.isabs(prompts_dir):
+            # 绝对路径
+            self.prompts_dir = prompts_dir
+        else:
+            # 相对路径，相对于prompts目录
+            self.prompts_dir = os.path.join(prompts_base_dir, prompts_dir)
+
         self._prompts = {}
         self._load_all_prompts()
     

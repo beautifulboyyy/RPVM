@@ -1,3 +1,22 @@
+<!-- OPENSPEC:START -->
+# OpenSpec Instructions
+
+These instructions are for AI assistants working in this project.
+
+Always open `@/openspec/AGENTS.md` when the request:
+- Mentions planning or proposals (words like proposal, spec, change, plan)
+- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
+- Sounds ambiguous and you need the authoritative spec before coding
+
+Use `@/openspec/AGENTS.md` to learn:
+- How to create and apply change proposals
+- Spec format and conventions
+- Project structure and guidelines
+
+Keep this managed block so 'openspec update' can refresh the instructions.
+
+<!-- OPENSPEC:END -->
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -85,6 +104,27 @@ pipeline = SequentialPipeline(config)
 result = pipeline.run(dataset)
 ```
 
+### Simple Examples (RPVM)
+
+```bash
+cd RPVM
+python simple_example.py --mode simple  # Single question demo
+python simple_example.py --mode batch   # Batch processing demo
+```
+
+### OpenAI API Configuration
+
+Set API key via environment variable or `.env` file in project root:
+```bash
+export OPENAI_API_KEY='your-api-key-here'
+export OPENAI_BASE_URL='https://api.openai.com/v1'  # Optional
+```
+
+Or pass via command line:
+```bash
+python run_rpvm_exp.py --openai_api_key your-key --dataset_name hotpotqa
+```
+
 ### Key Entry Points
 
 | File | Purpose |
@@ -132,15 +172,27 @@ All pipelines inherit from `BasicPipeline` (`flashrag/pipeline/pipeline.py:7`):
 ### RPVM Custom Implementation (RPVM/)
 
 A custom Reflective Plan-Verify Memory method for multi-hop QA:
-1. **Planner** - Generates reasoning plans using LLM
-2. **Retriever** - Retrieves documents for each plan (E5-based)
-3. **Verifier** - Validates plans against retrieved docs
-4. **Memory** - Stores verified/corrected plans across iterations
+1. **Planner** - Generates reasoning plans using LLM (returns "ANSWER_READY" or plan list)
+2. **Retriever** - Retrieves documents for each plan (E5-based, with query rewriting)
+3. **Verifier** - Validates plans against retrieved docs with verdicts:
+   - `supported` - Plan confirmed by evidence
+   - `contradicted` - Plan refuted by evidence (triggers correction)
+   - `insufficient` - Not enough evidence (no memory update)
+4. **Memory** - Stores verified/corrected plans across iterations with auto-summarization
 
 Key files:
 - `rpvm_pipeline.py` - RPVMPipeline class extending BasicPipeline
+- `rpvm_config.yaml` - RPVM-specific configuration
 - `run_rpvm_exp.py` - Experiment runner
 - `simple_example.py` - Simple usage examples
+- `prompt_loader.py` - Prompt management system
+- `prompts/` - Directory with all prompt templates (planner, verifier, query rewriter, memory summarizer, final answer)
+
+### RPVM Generator Interface
+
+RPVM uses dual-mode generation (`_call_generator` at `RPVM/rpvm_pipeline.py:50`):
+- **OpenAI**: Message list format `[{role: "system", content: ...}, {role: "user", content: ...}]`
+- **Local HF**: Qwen-style chat template with `<|im_start|>` and `<|im_end|>` tokens
 
 ### Configuration System
 
@@ -176,6 +228,16 @@ Supports multiple frameworks via unified interface:
 - **OpenAI API required for RPVM** - Uses gpt-3.5-turbo by default; set `OPENAI_API_KEY` env var
 - **Index building is CPU-intensive** - Small corpus (~14K docs) takes ~1.5 hours on CPU
 - **Ruff linting** - pyproject.toml extends select for W291, W293 (trailing whitespace)
+- **Environment variables** - RPVM reads `OPENAI_API_KEY` and `OPENAI_BASE_URL` from `.env` files
+
+## File Outputs
+
+RPVM experiments save to `output/rpvm_experiments/`:
+- `intermediate_data.jsonl` - Full reasoning trace per question (iterations, memory, retrievals)
+- `metric_score.txt` - EM/F1/ACC scores
+- `config.yaml` - Saved configuration copy
+
+FlashRAG experiments save based on `save_dir` config parameter.
 
 ## RPVM-Specific Configuration
 
@@ -184,3 +246,59 @@ Key parameters in `rpvm_config` section:
 - `max_retrieval_attempts` - Retries per plan (default: 2)
 - `retrieval_topk` - Documents per retrieval (default: 5)
 - `memory_max_tokens` - Memory size limit (default: 3000)
+
+## RPVM Experiment Analyzer
+
+Use the analyzer to diagnose RPVM experiment results and identify pipeline issues.
+
+### Claude Code Skill
+
+```bash
+@rpvm:analyze --path <experiment_dir> [--mode <quick|diagnostic|compare>] [--sample <num>]
+
+# Examples
+@rpvm:analyze --path RPVM/output/rpvm_experiments/run_1
+@rpvm:analyze --path . --mode diagnostic --sample 15
+@rpvm:analyze --path RPVM/output --mode compare --sample 20
+```
+
+**Follow-up commands:**
+- `详细分析第 X 条` - Analyze specific question by 0-based index
+- `显示异常案例` - Show cases with anomalies
+- `对比 golden answer for question X` - Compare specific question
+
+### CLI Tool
+
+```bash
+# From RPVM directory
+python analyze_rpvm_exp.py --path <experiment_dir> [--mode quick|diagnostic|compare] [--sample <num>]
+
+# Example
+python analyze_rpvm_exp.py --path ../output/rpvm_experiments/run_1 --mode diagnostic --sample 10
+```
+
+### Analysis Modes
+
+| Mode | Description |
+|------|-------------|
+| `quick` | Metrics + rule-based anomaly detection only |
+| `diagnostic` | Quick + LLM-based sampling assessment (recommended) |
+| `compare` | Diagnostic + golden answer comparison |
+
+### Key Metrics
+
+The analyzer detects these anomaly types:
+- **invalid_correction** - Contradicted but no actual change to plan
+- **early_answer_ready** - ANSWER_READY without sufficient memory
+- **verification_loop** - Same plan repeated across iterations
+- **contradiction_without_recovery** - Contradicted but never verified as supported
+
+### Programmatic Usage
+
+```python
+from RPVM.rpvm_analyzer import RPVMAnalyzer, generate_executive_summary
+
+analyzer = RPVMAnalyzer("path/to/experiment")
+result = analyzer.run(mode="diagnostic", sample_size=10, seed=42)
+print(generate_executive_summary(result))
+```

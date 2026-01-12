@@ -7,13 +7,42 @@ import sys
 import argparse
 from pathlib import Path
 
-from RPVM.rpvm_pipeline import RPVMPipeline
+# 添加flashRAG路径（必须在导入RPVM之前添加）
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# 当前脚本在 ~/lsw/RPVM/RPVM/run_qwen3-8b/
+# 需要找到 ~/lsw/flashrag 目录
+project_root = os.path.dirname(script_dir)  # ~/lsw/RPVM/RPVM
 
-# 添加flashRAG路径
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 查找flashRAG目录：优先使用同级flashRAG，否则使用父目录的flashRAG
+flashrag_path = None
+for candidate in [script_dir, project_root]:
+    flashrag_candidate = os.path.join(candidate, "flashrag")
+    if os.path.exists(flashrag_candidate):
+        flashrag_path = candidate
+        break
+
+# 如果当前目录结构没有flashrag，尝试project_parent
+if not flashrag_path:
+    project_parent = os.path.dirname(project_root)
+    flashrag_candidate = os.path.join(project_parent, "flashrag")
+    if os.path.exists(flashrag_candidate):
+        flashrag_path = project_parent
+        project_root = flashrag_candidate
+
+if flashrag_path:
+    sys.path.insert(0, flashrag_path)
+    print(f"flashRAG路径: {flashrag_path}")
+else:
+    raise ImportError("无法找到flashRAG目录，请确保项目结构正确")
+
+# 添加RPVM目录到路径（rpvm_pipeline.py 所在目录）
+# script_dir 是 run_qwen3-8b，rpvm_pipeline.py 在 RPVM/ 目录下
+rpvm_dir = os.path.dirname(script_dir)  # ~/lsw/RPVM/RPVM
+sys.path.insert(0, rpvm_dir)
 
 from flashrag.config import Config
 from flashrag.utils import get_dataset
+from rpvm_pipeline import RPVMPipeline
 
 
 def run_local_experiment(args):
@@ -32,7 +61,26 @@ def run_local_experiment(args):
     # 加载配置
     config_file_path = os.path.join(os.path.dirname(__file__), "rpvm_local_config.yaml")
     config = Config(config_file_path=config_file_path, config_dict=config_dict)
-    
+
+    # 修正路径为绝对路径（相对于RPVM目录）
+    rpvm_root = os.path.dirname(os.path.abspath(__file__))
+
+    if 'data_dir' in config and not os.path.isabs(config['data_dir']):
+        config['data_dir'] = os.path.join(rpvm_root, config['data_dir'])
+        print(f"数据集目录: {config['data_dir']}")
+
+    if 'index_path' in config and not os.path.isabs(config['index_path']):
+        config['index_path'] = os.path.join(rpvm_root, config['index_path'])
+        print(f"索引路径: {config['index_path']}")
+
+    if 'corpus_path' in config and not os.path.isabs(config['corpus_path']):
+        config['corpus_path'] = os.path.join(rpvm_root, config['corpus_path'])
+        print(f"语料库路径: {config['corpus_path']}")
+
+    if 'save_dir' in config and not os.path.isabs(config['save_dir']):
+        config['save_dir'] = os.path.join(rpvm_root, config['save_dir'])
+        print(f"输出目录: {config['save_dir']}")
+
     # 加载数据集
     print(f"加载数据集: {config['dataset_name']}, split: {args.split}")
     all_split = get_dataset(config)

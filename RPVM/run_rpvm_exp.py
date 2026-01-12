@@ -44,6 +44,9 @@ def run_rpvm_experiment(args):
         "split": args.split,
         "gpu_id": args.gpu_id,
         "save_note": save_note,
+        "rpvm_config": {
+            "prompt_dir": args.prompt_dir,
+        }
     }
     
     # 如果指定了OpenAI API Key
@@ -140,6 +143,14 @@ def main():
         type=str,
         default=None,
         help="OpenAI API base URL. If not specified, will read from environment variable OPENAI_BASE_URL"
+    )
+
+    parser.add_argument(
+        "--prompt_dir",
+        type=str,
+        default="openai",
+        choices=["openai", "qwen8b"],
+        help="Prompt directory to use (e.g., 'openai' or 'qwen8b'). Prompts are stored in RPVM/prompts/{prompt_dir}/"
     )
     
     args = parser.parse_args()

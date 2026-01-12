@@ -1,237 +1,256 @@
-# ✅ 一、总体思路（核心理念）
+# RPVM (Reflective Plan-Verify Memory) 算法说明
 
-**目标：**  
-构建一个「先规划推理链，再检索验证，每步验证后更新记忆」的迭代推理框架，  
-用**反思-行动-记忆（Reflect–Act–Remember）** 的方式解决多跳问题，  
-同时避免重复检索与上下文冗余。
+## 一、核心理念
 
-**核心创新点：**
+### 1.1 问题背景
 
-1.  不直接对每步生成-修正，而是**先推理出整体计划链（plan）再逐步验证**。
-    
-2.  通过**验证过的plan文本拼接形成短期记忆**，用以支撑下一轮规划与回答。
-    
-3.  当检索不到证据时，通过**rewrite + 扩大检索**，在有限次数内强化召回，而不是直接信任模型。
-    
-4.  无需复杂的权重、优先级、或多级记忆，保持「简单可复现」。
-    
+多跳问答（Multi-hop QA）需要模型进行链式推理，例如：
+> "Where was the director of film The Children (1990 Film) born?"
+
+这类问题需要模型：
+1. 先找出电影导演是谁
+2. 再找出该导演的出生地
+
+传统方法如 ReAct/CoT 采用**每步生成-检索-验证**的迭代模式，步骤繁琐且冗余。
+
+### 1.2 核心思想
+
+RPVM 由三个模块组成：
+
+**Planner（反思规划模块）**
+- 基于问题 Q 和现有记忆 M，生成**假设性断言链**
+- 一次性推理出所有推理步骤，利用 LLM 内部知识
+- 例如：`plan1: 导演是Tony Palmer` → `plan2: Tony Palmer出生在伦敦`
+
+**Verifier（验证模块）**
+- 利用 RAG 检索相关资料，验证每个 plan
+- 三种判定结果：supported / contradicted / insufficient
+
+**Memory（记忆模块）**
+- 缓存已验证的事实和检索资料
+- 支撑下一轮规划和答案生成
+
+### 1.3 核心创新点
+
+1. **一次性规划整个推理链**：相比传统逐步迭代，更好地利用 LLM 的全局推理能力
+2. **短路验证机制**：若某步 plan 被验证为错误，后续依赖该结果的 plan 直接丢弃，避免错误传播
+3. **记忆累积**：每轮迭代后保存已验证的事实，下一轮可基于已有知识继续推理
 
 ---
 
-# 🧩 二、整体流程框架
+## 二、算法流程
 
-## Step 0. 初始化
+### Step 0. 初始化
 
-```makefile
-Input: 
+```
+输入：
     Q = 原始问题
-    M = Memory (文本形式, 初始为空)
-Parameters:
-    max_iter = 3~5   # 最大循环次数
-    max_retrieval_attempts = 2  # 每个plan的最大检索尝试次数
+    M = Memory (初始为空)
+
+参数：
+    max_iter = 最大迭代次数
+    max_retrieval_attempts = 每个plan的最大检索尝试次数
 ```
 
+### Step 1. Reflective Planner（反思规划器）
+
+**输入**：Q, M
+**输出**：`ANSWER_READY` 或 plan列表 `[plan₁, plan₂, ...]`
+
+**逻辑**：
+- 若记忆 M 已包含足够信息回答问题 → 输出 `ANSWER_READY`
+- 否则，基于 Q 和 M 生成推理链，每条 plan 是可验证的自然语言断言
+
+### Step 2. Plan Verifier（验证模块）
+
+**输入**：当前未验证的 plan_k，问题 Q，记忆 M
+**流程**：
+
+1. **检索**：基于 plan 生成检索词，召回相关文档
+   - 若检索失败 → rewrite 检索词重试
+   - 若多次失败 → 标记 insufficient
+
+2. **判定**：基于文档判断 plan 的真实性
+   - **SUPPORTED**：被证据支持
+   - **CONTRADICTED**：与证据冲突
+   - **INSUFFICIENT**：无充分证据
+
+3. **处理结果**：
+   - **supported** → 精炼后加入 M
+   - **contradicted** → 修正后加入 M，**短路当前轮**
+   - **insufficient** → 不加入 M，**短路当前轮**
+
+### Step 3. Memory 更新
+
+**Memory 形式**：文本拼接
+
+```
+Memory:
+1. The director of film "The Children" (1990) is Tony Palmer. (verified)
+2. Tony Palmer was born in London. (verified)
+```
+
+**作用**：
+- 供下一轮 Planner 参考，避免重复检索
+- 最终合成答案的上下文
+
+### Step 4. 终止条件
+
+- Planner 输出 `ANSWER_READY` → 生成最终答案
+- 达到最大迭代次数 → 生成尽力答案（best-effort）
+
 ---
 
-## Step 1. Reflective Planner（反思规划器）
+## 三、完整案例演示
 
-**输入：** Q, M  
-**输出：** 一组按逻辑顺序排列的 plan = \[plan₁, plan₂, ...\]
+### 案例 1：第一轮全部验证正确
 
-**Prompt逻辑：**
+**Question**: Where was the director of film The Children (1990 Film) born?
 
-> 结合已有验证过的记忆 M，分析总问题 Q。  
-> 若记忆足以回答，直接给出最终答案；否则规划一条逻辑推理链（plan），每一条是可以被验证的自然语言断言。
-
-**例：**
-
-Q:
-
-> What is the name of the fight song of the university whose main campus is in Lawrence, Kansas and whose branch campuses are in the Kansas City metropolitan area?
+**Iteration 1 | Memory: (empty)**
 
 Planner 输出：
-
-```vbnet
-plan1: The university with main campus in Lawrence, Kansas and branch campuses in Kansas City metropolitan area is the University of Kansas.
-plan2: The fight song of the University of Kansas is "I'm a Jayhawk".
+```
+plan1: The director of the film "The Children" (1990) is Tony Palmer.
+plan2: Tony Palmer was born in London.
 ```
 
----
+Verifier 验证：
+- plan1 → supported ✅ → 加入 M
+- plan2 → supported ✅ → 加入 M
 
-## Step 2. Plan Verifier（验证模块）
-
-**输入：** 当前未验证的 planₖ，问题 Q，记忆 M  
-**流程：**
-
-1.  检索与 planₖ 相关的文档 docs。
-    
-    -   若未找到相关文档 → rewrite 检索词并重试。
-        
-    -   若多次检索仍无结果 → 标记 insufficient，不加入 M。
-    
-2.  让大模型基于 docs 判断：
-    
-    -   supported（被证据支持）
-        
-    -   contradicted（与证据冲突）
-        
-    -   insufficient（无充分证据）
-    
-3.  处理结果：
-    
-    -   **supported** → 将该 plan 精炼后加入 M
-        
-    -   **contradicted** → 修改为正确版本并加入 M，然后停止当前轮次（因为后续plan可能依赖错误）
-        
-    -   **insufficient** → 不加入 M，继续验证下一个 plan（若存在）
-        
-
----
-
-## Step 3. Memory 更新
-
-**Memory 形式：**
-
--   文本拼接形式即可（无需结构化表格）
-    
--   例如：
-    
-
-```vbnet
-Memory:
-1. The university with main campus in Lawrence, Kansas is the University of Kansas. (verified)
-2. The fight song of the University of Kansas is "I'm a Jayhawk". (verified)
+**Memory 更新**:
+```
+1. The director of the film "The Children" (1990) is Tony Palmer. (verified)
+2. Tony Palmer was born in London. (verified)
 ```
 
-**作用：**
+**Iteration 2 | Memory**: 已有完整推理链
 
--   供下一轮 planner 参考，避免重复检索。
-    
--   最终合成答案的上下文。
-    
-
----
-
-## Step 4. 反思与终止条件
-
--   当 planner 发现当前记忆 M 已足够覆盖回答 Q → 直接生成最终答案。
-    
--   或达到最大循环次数 → 输出 best-effort answer，并标记不确定性。
-    
-
----
-
-# ⚙️ 三、完整伪流程（简化实现逻辑）
-
-```python
-initialize M = ""
-for i in range(max_iter):
-    plans = planner(Q, M)
-
-    # 若 planner 认为记忆已足够
-    if plans == "ANSWER_READY":
-        return generate_final_answer(Q, M)
-
-    for plan in plans:
-        for attempt in range(max_retrieval_attempts):
-            docs = retrieve(plan)
-            if not docs:
-                plan = rewrite_retrieval(plan)
-                continue
-
-            verdict, corrected_plan, evidence = verify(plan, docs)
-
-            if verdict == "supported":
-                M += f"\n{corrected_plan} (verified)"
-                break
-            elif verdict == "contradicted":
-                M += f"\n{corrected_plan} (corrected)"
-                break  # 当前轮结束
-            else:  # insufficient
-                if attempt < max_retrieval_attempts - 1:
-                    plan = rewrite_retrieval(plan)
-                else:
-                    pass  # 放弃该plan
-    # 下一轮重新plan
-return generate_best_effort_answer(Q, M)
+Planner 输出：
+```
+ANSWER_READY
 ```
 
+**最终答案**: Tony Palmer was born in London.
+
 ---
 
-# 🧠 四、例子演示
+### 案例 2：短路重规划机制（核心创新）
 
-### 第 1 轮
+**Question**: Which country the director of film The Boys In The Band (2020 Film) is from?
 
-**Planner 输出：**
+**Iteration 1 | Memory: (empty)**
 
-```vbnet
-plan1: The university with main campus in Lawrence, Kansas and branch campuses in Kansas City area is the University of Kansas.
-plan2: The fight song of the University of Kansas is "I'm a Jayhawk".
+Planner 输出：
+```
+plan1: The director of "The Boys In The Band" (2020) is Mart Crowley.
+plan2: Mart Crowley comes from the United States.
 ```
 
-**Verifier 验证：**
+Verifier 验证：
+- plan1 → **contradicted** ❌ → 修正为 Joe Mantello，加入 M → **短路当前轮**
+- plan2 → 直接丢弃（依赖错误的 plan1）
 
--   plan1 → supported ✅ → 加入 M
-    
--   plan2 → contradicted ❌（docs 提示实际是 "Kansas Song"）→ 修正并加入 M → 停止当前轮
-    
-
-**Memory 更新：**
-
-```vbnet
-M:
-1. The university with main campus in Lawrence, Kansas is the University of Kansas. (verified)
-2. The fight song of the University of Kansas is "Kansas Song". (corrected)
+**Memory 更新**:
+```
+1. The director of "The Boys In The Band" (2020) is Joe Mantello. (corrected)
 ```
 
----
+**Iteration 2 | Memory**: 已纠正导演信息
 
-### 第 2 轮
+Planner 输出：
+```
+plan1: Joe Mantello comes from the United States.
+```
 
-Planner 读取 M：
+Verifier 验证：
+- plan1 → supported ✅ → 加入 M
 
-> 已经知道大学是谁 + 战歌是什么  
-> → 输出：  
-> “Based on the verified facts, the answer is: The fight song is ‘Kansas Song’.”
+**Memory 更新**:
+```
+1. The director of "The Boys In The Band" (2020) is Joe Mantello. (corrected)
+2. Joe Mantello comes from the United States. (verified)
+```
 
-✅ 终止。
+**Iteration 3 | Memory**: 已有完整信息
 
----
+Planner 输出：
+```
+ANSWER_READY
+```
 
-# 🔍 五、分析与优点
+**最终答案**: Joe Mantello is from the United States.
 
-| 维度 | 优化后框架的特点 |
-| --- | --- |
-| **推理结构** | Plan → Verify → Memory 循环，自然符合人类推理节奏 |
-| **模块数量** | 仅 3 核心模块（Planner, Verifier, Memory） |
-| **复杂度** | 去掉了优先级、多级记忆、置信度等繁琐细节 |
-| **可解释性** | 每个验证过的 plan 都是“显式证据 + 修改后的事实” |
-| **成本控制** | 检索与验证次数可控（max\_retrieval\_attempts, max\_iter） |
-| **错误隔离** | 一旦 contradicted，立即短路当前链，防止错误扩散 |
-| **避免冗余** | 验证过的信息直接拼接存储，后续重复问题不再检索 |
-
----
-
-# 📊 六、可扩展性建议（后续优化点）
-
-1.  **Memory 压缩**：每轮结束可让 LLM 对 M 做一次「证据摘要」，保持上下文紧凑。
-    
-2.  **检索策略自适应**：若连续出现 insufficient，可让模型调整检索方向（site/domain、时间、语言）。
-    
-3.  **错误纠正学习**：contradicted 断言可存储为“已纠正事实”，防止未来重复错误。
-    
-4.  **终止条件优化**：可用启发式判断「M 中信息覆盖率 >80% 即停止」。
-    
+**创新点解析**：
+- 传统方法可能需要更多轮次逐步发现错误
+- RPVM 在第一轮验证 plan1 时立即发现错误，修正并短路
+- 第二轮基于纠正后的信息重新规划，高效收敛
 
 ---
 
-## 🧾 七、总结一句话框架说明
+### 案例 3：比较推理（两人出生年份对比）
 
-> **Reflective Plan-Verify Memory (RPVM)**  
-> 大模型先规划推理链，再通过检索验证逐步完善，  
-> 将验证过的事实以文本形式存入记忆中，  
-> 通过反思循环减少重复检索与上下文冗余，  
-> 在有限步内稳定收敛到正确答案。
+**Question**: Which film has the director who was born first, State Penitentiary (Film) or Folly Of Love?
+
+**Iteration 1 | Memory: (empty)**
+
+Planner 输出：
+```
+plan1: The director of "State Penitentiary" was born in a specific year.
+plan2: The director of "Folly Of Love" was born in an earlier year.
+```
+
+Verifier 验证：
+- plan1 → **supported** ✅ → 加入 M (Lew Landers, born in 1901)
+- plan2 → **insufficient** ⚠️ → 不加入 M，短路当前轮
+
+**Iteration 2 | Memory**: 已知 State Penitentiary 导演信息
+
+Planner 输出：
+```
+plan1: The director of "Folly Of Love" was born before 1901.
+```
+
+Verifier 验证：
+- plan1 → **supported** ✅ → 加入 M (born in 1895)
+
+**Iteration 3 | Memory**: 两人出生年份都已确认
+
+Planner 输出：
+```
+ANSWER_READY
+```
+
+**最终答案**: The director of Folly Of Love was born first (1895 vs 1901).
 
 ---
 
+## 四、与传统方法对比
+
+| 维度 | ReAct/CoT（传统迭代式） | RPVM（本文方法） |
+|------|-------------------------|------------------|
+| **规划方式** | 每步生成-检索-观察 | 一次性生成完整推理链 |
+| **LLM调用** | 较多（每步都需LLM介入） | 较少（验证可无需LLM） |
+| **错误传播** | 错误逐步累积 | 短路机制阻止错误扩散 |
+| **记忆利用** | 上下文记忆，有限长度 | 显式记忆累积，可累积多轮 |
+| **全局推理** | 较弱（逐步局部推理） | 较强（一次性全局规划） |
+
+### 优势总结
+
+1. **减少冗余召回**：一次性规划避免重复检索相似内容
+2. **更快收敛**：若 LLM 内部知识准确，可能两轮即得出答案
+3. **错误隔离**：短路机制防止错误传播，提高准确率
+4. **可解释性**：每个 plan 都有明确验证状态和证据
+
+---
+
+## 五、总结
+
+**RPVM（Reflective Plan-Verify Memory）** 是一种面向多跳问答的迭代推理框架：
+
+1. **Planner** 利用 LLM 内部知识一次性生成完整推理假设链
+2. **Verifier** 通过 RAG 验证每个假设，支持短路机制防止错误传播
+3. **Memory** 累积已验证的事实，支撑后续推理
+
+该方法核心创新在于：**最大化利用 LLM 的全局推理能力，同时通过验证和短路机制确保推理准确性**。

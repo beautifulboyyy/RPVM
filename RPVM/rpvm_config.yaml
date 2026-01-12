@@ -48,6 +48,7 @@ rpvm_config:
   planner_temperature: 0.7  # 规划器的温度参数
   verifier_temperature: 0.3  # 验证器的温度参数(更保守)
   final_answer_temperature: 0.5  # 最终答案生成的温度参数
+  prompt_dir: "openai"  # prompt目录: "openai" 或 "qwen8b"
 
 # ========== 评估设置 ==========
 metrics: ["em", "f1", "acc"]
