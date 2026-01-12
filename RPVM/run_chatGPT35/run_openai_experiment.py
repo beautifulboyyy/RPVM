@@ -48,13 +48,18 @@ def run_openai_experiment(args):
     # 加载配置
     config_file_path = os.path.join(os.path.dirname(__file__), "rpvm_openai_config.yaml")
     config = Config(config_file_path=config_file_path, config_dict=config_dict)
-    
-    # 修正路径为绝对路径（相对于RPVM目录）
+
+    # 修正路径为绝对路径（必须在 Config 初始化之后，因为 Config 会使用 data_dir 构建 dataset_path）
     rpvm_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
+
     if 'data_dir' in config and not os.path.isabs(config['data_dir']):
         config['data_dir'] = os.path.join(rpvm_root, config['data_dir'])
         print(f"数据集目录: {config['data_dir']}")
+
+    # 重新构建 dataset_path（因为 data_dir 已修改）
+    if 'dataset_path' in config:
+        config['dataset_path'] = os.path.join(config['data_dir'], config['dataset_name'])
+        print(f"数据集路径: {config['dataset_path']}")
     
     if 'index_path' in config and not os.path.isabs(config['index_path']):
         config['index_path'] = os.path.join(rpvm_root, config['index_path'])
@@ -63,7 +68,11 @@ def run_openai_experiment(args):
     if 'corpus_path' in config and not os.path.isabs(config['corpus_path']):
         config['corpus_path'] = os.path.join(rpvm_root, config['corpus_path'])
         print(f"语料库路径: {config['corpus_path']}")
-    
+
+    if 'retrieval_model_path' in config and not os.path.isabs(config['retrieval_model_path']):
+        config['retrieval_model_path'] = os.path.join(rpvm_root, config['retrieval_model_path'])
+        print(f"检索模型路径: {config['retrieval_model_path']}")
+
     if 'save_dir' in config and not os.path.isabs(config['save_dir']):
         config['save_dir'] = os.path.join(rpvm_root, config['save_dir'])
         print(f"输出目录: {config['save_dir']}")

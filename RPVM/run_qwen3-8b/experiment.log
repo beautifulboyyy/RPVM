@@ -4,18 +4,18 @@ flashRAG路径: /home/algroup/lsw/RPVM
 数据集目录: /home/algroup/lsw/RPVM/RPVM/run_qwen3-8b/../datasets
 索引路径: /home/algroup/lsw/RPVM/RPVM/run_qwen3-8b/../indexes/wiki18_100w_index_sq8/e5_SQ8.index
 语料库路径: /home/algroup/lsw/RPVM/RPVM/run_qwen3-8b/../indexes/wiki18_100w.jsonl
-输出目录: /home/algroup/lsw/RPVM/RPVM/run_qwen3-8b/../output/rpvm_local_experiments/2wikimultihopqa_2026_01_12_16_32_rpvm_local_dev
+输出目录: /home/algroup/lsw/RPVM/RPVM/run_qwen3-8b/../output/rpvm_local_experiments/2wikimultihopqa_2026_01_12_17_10_rpvm_local_dev
 加载数据集: 2wikimultihopqa, split: dev
 Loading dev datasets from: ../datasets/2wikimultihopqa/dev.jsonl...
-仅使用 3 个样本进行测试
+仅使用 5 个样本进行测试
 Load data from provided data
-数据集大小: 3
+数据集大小: 5
 正在初始化 RPVM Pipeline...
-Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:01<00:04,  1.07s/it]Loading checkpoint shards:  40%|████      | 2/5 [00:02<00:03,  1.08s/it]Loading checkpoint shards:  60%|██████    | 3/5 [00:03<00:02,  1.09s/it]Loading checkpoint shards:  80%|████████  | 4/5 [00:04<00:01,  1.04s/it]Loading checkpoint shards: 100%|██████████| 5/5 [00:04<00:00,  1.27it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:04<00:00,  1.10it/s]
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:01<00:04,  1.10s/it]Loading checkpoint shards:  40%|████      | 2/5 [00:02<00:03,  1.11s/it]Loading checkpoint shards:  60%|██████    | 3/5 [00:03<00:02,  1.13s/it]Loading checkpoint shards:  80%|████████  | 4/5 [00:04<00:01,  1.07s/it]Loading checkpoint shards: 100%|██████████| 5/5 [00:04<00:00,  1.23it/s]Loading checkpoint shards: 100%|██████████| 5/5 [00:04<00:00,  1.06it/s]
 开始运行 RPVM 实验...
-RPVM Processing:   0%|          | 0/3 [00:00<?, ?it/s]RPVM Processing:  33%|███▎      | 1/3 [00:29<00:59, 29.62s/it]RPVM Processing:  67%|██████▋   | 2/3 [00:47<00:22, 22.94s/it]RPVM Processing: 100%|██████████| 3/3 [01:15<00:00, 24.94s/it]RPVM Processing: 100%|██████████| 3/3 [01:15<00:00, 25.07s/it]
+RPVM Processing:   0%|          | 0/5 [00:00<?, ?it/s]RPVM Processing:  20%|██        | 1/5 [01:37<06:31, 97.98s/it]RPVM Processing:  40%|████      | 2/5 [02:34<03:40, 73.58s/it]RPVM Processing:  60%|██████    | 3/5 [03:39<02:19, 69.69s/it]RPVM Processing:  80%|████████  | 4/5 [04:51<01:10, 70.52s/it]RPVM Processing: 100%|██████████| 5/5 [05:55<00:00, 68.23s/it]RPVM Processing: 100%|██████████| 5/5 [05:55<00:00, 71.10s/it]
 Use `query: ` as retreival instruction
-Intermediate data saved to: /home/algroup/lsw/RPVM/RPVM/run_qwen3-8b/../output/rpvm_local_experiments/2wikimultihopqa_2026_01_12_16_32_rpvm_local_dev/intermediate_data.jsonl
+Intermediate data saved to: /home/algroup/lsw/RPVM/RPVM/run_qwen3-8b/../output/rpvm_local_experiments/2wikimultihopqa_2026_01_12_17_10_rpvm_local_dev/intermediate_data.jsonl
 {'f1': 0.0, 'acc': 0.0}
 实验完成！
-结果保存到: /home/algroup/lsw/RPVM/RPVM/run_qwen3-8b/../output/rpvm_local_experiments/2wikimultihopqa_2026_01_12_16_32_rpvm_local_dev
+结果保存到: /home/algroup/lsw/RPVM/RPVM/run_qwen3-8b/../output/rpvm_local_experiments/2wikimultihopqa_2026_01_12_17_10_rpvm_local_dev

@@ -15,7 +15,7 @@ split: ["dev"]  # 使用dev集
 
 # ========== 检索器设置 (E5) ==========
 retrieval_method: "e5"
-retrieval_model_path: "e5-base-v2"  # E5模型路径（本地）
+retrieval_model_path: "/home/algroup/lsw/RPVM/RPVM/e5-base-v2"  # E5模型路径（本地）
 index_path: "indexes/wiki18_100w_index_sq8/e5_SQ8.index"
 corpus_path: "indexes/wiki18_100w.jsonl"
 retrieval_topk: 1

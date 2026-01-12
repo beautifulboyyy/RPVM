@@ -76,12 +76,12 @@ class RPVMPipeline(BasicPipeline):
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ]
-                # 使用 enable_thinking=False 禁用思考模式
+                # 使用 enable_thinking=True 打开思考模式
                 text = self.generator.tokenizer.apply_chat_template(
                     messages,
                     tokenize=False,
                     add_generation_prompt=True,
-                    enable_thinking=False
+                    enable_thinking=True  # 打开思考模式以提升推理能力
                 )
                 response = self.generator.generate(
                     [text],

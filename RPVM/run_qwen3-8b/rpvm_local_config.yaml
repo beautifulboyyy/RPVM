@@ -45,7 +45,7 @@ rpvm_config:
   memory_max_tokens: 3000  # 记忆的最大token数
   enable_memory_summary: True  # 是否启用记忆摘要
   planner_temperature: 0.1  # 规划器的温度参数，降低以减少发散性废话
-  verifier_temperature: 0.3  # 验证器的温度参数
+  verifier_temperature: 0.6  # 思考模式建议温度
   final_answer_temperature: 0.5  # 最终答案生成的温度参数
   prompt_dir: "qwen8b"  # 使用qwen8b专用prompts
 
