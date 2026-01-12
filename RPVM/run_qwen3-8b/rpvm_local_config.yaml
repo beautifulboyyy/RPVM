@@ -58,4 +58,5 @@ save_metric_score: True
 # ========== 其他设置 ==========
 use_fid: False
 refiner_name: null
-silent_retrieval: False
+silent_retrieval: True  # 禁用检索器内部进度条 (Encoding process)
+silent_generation: True  # 禁用生成器内部进度条 (Generation process)

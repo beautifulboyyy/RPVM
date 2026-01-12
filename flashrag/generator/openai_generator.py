@@ -55,6 +55,7 @@ class OpenaiGenerator:
         self.model_name = self._config["generator_model"]
         self.batch_size = self._config["generator_batch_size"]
         self.generation_params = self._config["generation_params"]
+        self.silent = self._config["silent_generation"] if "silent_generation" in self._config else False
 
         self.openai_setting = self._config["openai_setting"]
         if self.openai_setting["api_key"] is None:
@@ -84,7 +85,7 @@ class OpenaiGenerator:
     async def _get_batch_response(self, input_list: List[List], batch_size, mode, **params):
         tasks = [self._get_response(messages, mode, **params) for messages in input_list]
         all_results = []
-        for idx in tqdm(range(0, len(tasks), batch_size), desc="Generation process: "):
+        for idx in tqdm(range(0, len(tasks), batch_size), desc="Generation process: ", disable=self.silent):
             batch_tasks = tasks[idx: idx + batch_size]
             batch_results = await asyncio.gather(*batch_tasks)
             all_results.extend(batch_results)

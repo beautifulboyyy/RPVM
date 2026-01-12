@@ -43,6 +43,7 @@ class BaseGenerator:
         self.device = self._config["device"]
         self.gpu_num = self._config['gpu_num']
         self.generation_params = self._config["generation_params"]
+        self.silent = self._config["silent_generation"] if "silent_generation" in self._config else False
     
     def update_additional_setting(self):
         pass
@@ -128,7 +129,7 @@ class EncoderDecoderGenerator(BaseGenerator):
         generation_params = resolve_max_tokens(params, generation_params, prioritize_new_tokens=True)
 
         responses = []
-        for idx in trange(0, len(input_list), batch_size, desc="Generation process: "):
+        for idx in trange(0, len(input_list), batch_size, desc="Generation process: ", disable=self.silent):
             batched_prompts = input_list[idx : idx + batch_size]
             if self.fid:
                 # assume each input in input_list is a list, contains K string
@@ -407,7 +408,7 @@ class HFCausalLMGenerator(BaseGenerator):
         generated_token_logits = []
 
         import torch
-        for idx in trange(0, len(input_list), batch_size, desc="Generation process: "):
+        for idx in trange(0, len(input_list), batch_size, desc="Generation process: ", disable=self.silent):
             with torch.inference_mode():
                 torch.cuda.empty_cache()
                 batched_prompts = input_list[idx : idx + batch_size]

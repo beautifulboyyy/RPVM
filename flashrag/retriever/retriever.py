@@ -406,6 +406,7 @@ class DenseRetriever(BaseTextRetriever):
                 max_length=self.query_max_length,
                 use_fp16=self.use_fp16,
                 instruction=self.instruction,
+                silent=self.silent,
             )
 
     def _check_pooling_method(self, model_path, pooling_method):
