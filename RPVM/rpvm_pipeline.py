@@ -45,11 +45,6 @@ class RPVMPipeline(BasicPipeline):
         prompt_dir = rpvm_config.get('prompt_dir', 'openai') if isinstance(rpvm_config, dict) else 'openai'
         self.prompt_loader = PromptLoader(prompts_dir=prompt_dir)
 
-        # 检测是否是Qwen3模型（需要禁用thinking模式）
-        self.is_qwen3 = False
-        if hasattr(self.generator, 'model_name'):
-            self.is_qwen3 = 'qwen3' in self.generator.model_name.lower()
-
         # 用于记录中间数据
         self.intermediate_data = []
 
@@ -69,38 +64,18 @@ class RPVMPipeline(BasicPipeline):
                 max_tokens=max_tokens
             )[0]
         else:
-            # 本地 HF 模型
-            if self.is_qwen3 and hasattr(self.generator, 'tokenizer'):
-                # Qwen3: 使用 apply_chat_template 并禁用 thinking 模式
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ]
-                # 使用 enable_thinking=True 打开思考模式
-                text = self.generator.tokenizer.apply_chat_template(
-                    messages,
-                    tokenize=False,
-                    add_generation_prompt=True,
-                    enable_thinking=True  # 打开思考模式以提升推理能力
-                )
-                response = self.generator.generate(
-                    [text],
-                    temperature=temperature,
-                    max_new_tokens=max_tokens
-                )[0]
-            else:
-                # 其他 HF 模型：使用手动构建的 chat template
-                full_prompt = f"""<|im_start|>system
+            # 本地 HF 模型：使用手动构建的 chat template
+            full_prompt = f"""<|im_start|>system
 {system_prompt}<|im_end|>
 <|im_start|>user
 {user_prompt}<|im_end|>
 <|im_start|>assistant
 """
-                response = self.generator.generate(
-                    [full_prompt],
-                    temperature=temperature,
-                    max_new_tokens=max_tokens
-                )[0]
+            response = self.generator.generate(
+                [full_prompt],
+                temperature=temperature,
+                max_new_tokens=max_tokens
+            )[0]
 
         return response.strip()
 
@@ -301,8 +276,8 @@ class RPVMPipeline(BasicPipeline):
         if not plans and response.strip():
             for line in lines:
                 line = line.strip()
-                # 过滤掉思考标签和命令式语句
-                if line and not line.startswith('#') and not line.startswith('[') and not line.startswith('<'):
+                # 过滤掉注释和命令式语句
+                if line and not line.startswith('#') and not line.startswith('['):
                     # 过滤掉以命令动词开头的行
                     if not re.match(r'^(Find|Search|Check|Identify|Look|Determine|Compare)\s', line, re.IGNORECASE):
                         plans.append(line)
@@ -361,7 +336,7 @@ class RPVMPipeline(BasicPipeline):
             max_tokens=64     # 轻量任务
         )
 
-        cleaned = self._remove_thinking_content(rewritten.strip())
+        cleaned = rewritten.strip()
 
         # 提取Query: 去除 "Query:" 前缀
         if ':' in cleaned:
@@ -390,8 +365,6 @@ class RPVMPipeline(BasicPipeline):
             max_tokens=300
         )
 
-        # 移除思考内容
-        response = self._remove_thinking_content(response)
         verdict, corrected_plan, evidence = self._parse_verification_response(response, plan)
         
         return verdict, corrected_plan, evidence
@@ -415,6 +388,10 @@ class RPVMPipeline(BasicPipeline):
                     verdict = "insufficient"
             elif line.lower().startswith('corrected statement:') or line.lower().startswith('corrected:'):
                 corrected_plan = line.split(':', 1)[1].strip()
+                # 去除首尾的单引号或双引号
+                if (corrected_plan.startswith("'") and corrected_plan.endswith("'")) or \
+                   (corrected_plan.startswith('"') and corrected_plan.endswith('"')):
+                    corrected_plan = corrected_plan[1:-1].strip()
             elif line.lower().startswith('evidence:'):
                 evidence = line.split(':', 1)[1].strip()
         
@@ -434,24 +411,9 @@ class RPVMPipeline(BasicPipeline):
                 max_tokens=500
             )
 
-            return self._remove_thinking_content(summarized.strip())
+            return summarized.strip()
         
         return memory
-
-    def _remove_thinking_content(self, text: str) -> str:
-        """移除Qwen3思考模式产生的思考内容"""
-        import re
-        # 移除 <|think|>...<|think|> 格式的内容
-        text = re.sub(r'<\|think\|>.*?<\|think\|>', '', text, flags=re.DOTALL)
-        # 移除 <thinking>...</thinking> 格式的内容
-        text = re.sub(r'<thinking>.*?</thinking>', '', text, flags=re.DOTALL)
-        # 移除 "Okay, let's see..." 等思考前缀
-        text = re.sub(r"^Okay,? let's see\.?\s*", '', text, flags=re.DOTALL)
-        text = re.sub(r"^Let me think\.?\s*", '', text, flags=re.DOTALL)
-        text = re.sub(r"^First,?\s+", '', text, flags=re.DOTALL)
-        # 清理多余的空白和换行
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text
 
     def _generate_final_answer(self, question: str, memory: str) -> str:
         """基于记忆生成最终答案"""
@@ -464,7 +426,7 @@ class RPVMPipeline(BasicPipeline):
             max_tokens=200
         )
 
-        return self._remove_thinking_content(answer.strip())
+        return answer.strip()
 
     def _generate_best_effort_answer(self, question: str, memory: str) -> str:
         """在达到最大迭代次数时生成尽力回答"""
@@ -477,7 +439,7 @@ class RPVMPipeline(BasicPipeline):
             max_tokens=200
         )
 
-        return self._remove_thinking_content(answer.strip())
+        return answer.strip()
 
     def _save_intermediate_data(self):
         """保存中间数据到文件"""
