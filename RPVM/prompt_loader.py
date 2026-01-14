@@ -42,8 +42,8 @@ class PromptLoader:
             'planner_user_without_memory': 'planner_user_without_memory.md',
             'verifier_system': 'verifier_system.md',
             'verifier_user': 'verifier_user.md',
-            'query_rewriter_system': 'query_rewriter_system.md',
-            'query_rewriter_user': 'query_rewriter_user.md',
+            'verifier_query_system': 'verifier_query_system.md',
+            'verifier_query_user': 'verifier_query_user.md',
             'memory_summarizer_system': 'memory_summarizer_system.md',
             'memory_summarizer_user': 'memory_summarizer_user.md',
             'final_answer_system': 'final_answer_system.md',
@@ -107,25 +107,26 @@ class PromptLoader:
     def get_verifier_prompt(self, plan: str, docs_text: str) -> tuple:
         """
         获取Verifier的system和user prompt
-        
+
         Returns:
             (system_prompt, user_prompt)
         """
         system_prompt = self.get('verifier_system')
         user_prompt = self.get('verifier_user', plan=plan, docs_text=docs_text)
         return system_prompt, user_prompt
-    
-    def get_query_rewriter_prompt(self, plan: str, attempt: int) -> tuple:
+
+    def get_verifier_query_prompt(self, question: str, plan: str) -> tuple:
         """
-        获取Query Rewriter的system和user prompt
-        
+        获取Verifier Query Extractor的system和user prompt
+        用于从原始问题中提取权威实体，生成不包含plan幻觉的检索词
+
         Returns:
             (system_prompt, user_prompt)
         """
-        system_prompt = self.get('query_rewriter_system')
-        user_prompt = self.get('query_rewriter_user', plan=plan, attempt=attempt)
+        system_prompt = self.get('verifier_query_system')
+        user_prompt = self.get('verifier_query_user', question=question, plan=plan)
         return system_prompt, user_prompt
-    
+
     def get_memory_summarizer_prompt(self, memory: str) -> tuple:
         """
         获取Memory Summarizer的system和user prompt

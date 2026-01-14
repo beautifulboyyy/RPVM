@@ -312,51 +312,62 @@ class RPVMPipeline(BasicPipeline):
     def _verify_plan(self, plan: str, question: str, memory: str) -> Tuple[str, str, str, int]:
         """
         Plan Verifier: 验证单个plan
-        
+
+        改进后的流程:
+        1. 从 Q 和 Plan 提取权威锚点 + 关系，生成检索词
+        2. 基于优化后的检索词召回文档
+        3. 将 Plan 与召回文档对比，输出判定结果
+
         Returns:
             (verdict, corrected_plan, evidence, num_retrievals)
             verdict: "supported" | "contradicted" | "insufficient"
         """
+        # Step 1: REAR 查询提取 - 用原始问题的权威实体构造查询
+        current_query = self._extract_verification_query(question, plan)
+
+        # Step 2: 检索文档
         retrievals_count = 0
-        docs = []
-        current_query = plan
-        
-        # 尝试检索相关文档
-        for attempt in range(self.max_retrieval_attempts):
-            # 检索
-            retrieved_docs = self.retriever.batch_search([current_query], num=self.retrieval_topk)
-            retrievals_count += 1
-            
-            if retrieved_docs and retrieved_docs[0]:
-                docs = retrieved_docs[0]
-                break
-            else:
-                # 检索失败,尝试改写查询
-                if attempt < self.max_retrieval_attempts - 1:
-                    current_query = self._rewrite_query(plan, attempt + 1)
-        
+        retrieved_docs = self.retriever.batch_search([current_query], num=self.retrieval_topk)
+        retrievals_count += 1
+
+        docs = retrieved_docs[0] if retrieved_docs and retrieved_docs[0] else []
+
         # 如果没有检索到文档
         if not docs:
             return "insufficient", plan, "No relevant documents found", retrievals_count
-        
-        # 基于检索到的文档进行验证
+
+        # Step 3: 基于检索到的文档进行验证
         verdict, corrected_plan, evidence = self._verify_with_docs(plan, docs, question, memory)
-        
+
         return verdict, corrected_plan, evidence, retrievals_count
 
-    def _rewrite_query(self, plan: str, attempt: int) -> str:
-        """改写检索查询以提高召回"""
-        system_prompt, user_prompt = self.prompt_loader.get_query_rewriter_prompt(plan, attempt)
-        
+    def _extract_verification_query(self, question: str, plan: str) -> str:
+        """
+        REAR Strategy: 从原始问题中提取权威实体，生成不含Plan幻觉的检索词
+
+        Args:
+            question: 原始问题（包含权威实体）
+            plan: 当前待验证的plan（可能包含幻觉）
+
+        Returns:
+            优化后的检索词
+        """
+        system_prompt, user_prompt = self.prompt_loader.get_verifier_query_prompt(question, plan)
+
         rewritten = self._call_generator(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            temperature=0.5,
-            max_tokens=100
+            temperature=0.1,  # 低温保证确定性
+            max_tokens=64     # 轻量任务
         )
 
         cleaned = self._remove_thinking_content(rewritten.strip())
-        return cleaned if cleaned else plan
+
+        # 提取Query: 去除 "Query:" 前缀
+        if ':' in cleaned:
+            cleaned = cleaned.split(':', 1)[1].strip()
+
+        return cleaned if cleaned else question
 
     def _verify_with_docs(self, plan: str, docs: List[Dict], question: str, memory: str) -> Tuple[str, str, str]:
         """
