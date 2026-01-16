@@ -1,12 +1,13 @@
-# RPVM方法OpenAI实验配置文件
+# RPVM方法OpenAI实验配置文件（重构版）
 # 使用 wiki18 小语料库 + ChatGPT-3.5 API
+# 重构后使用GPT35风格的prompts
 
 # ========== 基本设置 ==========
 data_dir: "datasets"  # 数据集目录
 save_dir: "output/rpvm_openai_experiments"
 seed: 2024
 save_intermediate_data: True
-save_note: "rpvm_chatgpt35"
+save_note: "rpvm_gpt35_refactored"
 gpu_id: "0"
 
 # ========== 数据集设置 ==========
@@ -35,14 +36,23 @@ generation_params:
   temperature: 0.7
   top_p: 0.9
 
-# ========== RPVM特定参数 ==========
+# ========== RPVM特定参数（重构版）============
 rpvm_config:
-  max_iter: 2  # 最大迭代次数
+  # 核心参数
+  max_iter: 3  # 最大迭代次数（重构后建议3-5次，Planner每次可生成多个plan）
   max_retrieval_attempts: 1  # 每个plan的最大检索尝试次数
-  retrieval_topk: 1  # 每次检索返回的文档数
+  retrieval_topk: 2  # 每次检索返回的文档数
+
+  # Prompt风格设置
+  prompt_dir: "GPT35"  # 使用重构后的GPT35风格prompts
+                        # 可选值: "GPT35" (重构版) 或 "openai" (原版)
+
+  # Memory设置
   memory_max_tokens: 3000  # 记忆的最大token数
   enable_memory_summary: True  # 是否启用记忆摘要
-  planner_temperature: 0.3  # 规划器的温度参数，降低以减少发散性废话
+
+  # 温度参数
+  planner_temperature: 0.3  # 规划器的温度参数
   verifier_temperature: 0.3  # 验证器的温度参数
   final_answer_temperature: 0.5  # 最终答案生成的温度参数
 
