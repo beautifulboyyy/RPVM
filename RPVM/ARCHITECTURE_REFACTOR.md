@@ -13,7 +13,7 @@
 ### 1.2 重构目标
 
 - 拆分Planner的Generate功能，单独作为独立模块
-- 明确Memory的两种记忆类型：Golden Evidence和上下文路径记忆
+- 统一Memory设计：既是验证过的证据（Golden Evidence），也是推理路径的上下文记录
 - 明确各模块边界，避免功能杂糅
 
 ---
@@ -29,12 +29,15 @@
 | **Memory** | 知识压缩 + 证据绑定（LLM调用） |
 | **Generate** | 基于已验证路径生成最终答案 |
 
-### 2.2 Memory两种记忆类型
+### 2.2 统一记忆设计
 
-| 记忆类型 | 内容 | 更新时机 | 用途 |
-|----------|------|----------|------|
-| **Golden Evidence** | 与原始问题Q相关的精炼路径知识 | Plan=supported/corrected时 | Judge判断依据、最终答案生成 |
-| **上下文路径记忆** | 已验证的路径序列 | 每次验证成功后 | 避免重复生成已验证plan |
+**Memory = Golden Evidence + 上下文路径**（二者统一）
+
+| 内容 | 说明 |
+|------|------|
+| 精炼路径知识 | 与原始问题Q相关的、可用于后续推理的路径级别知识 |
+
+**核心思想**：Memory中存储的既是验证过的证据（Golden Evidence），也是推理路径的上下文记录（上下文路径）。二者合一，精炼为可直接用于推理的知识单元。
 
 ---
 
@@ -51,7 +54,7 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Planner (2次LLM)                             │
 ├─────────────────────────────────────────────────────────────────────┤
-│  输入: Question + Golden Evidence Memory                            │
+│  输入: Question + Memory                                            │
 │                                                                        │
 │  [Step 1: Judge]                                                     │
 │    Prompt: "基于当前记忆，是否能回答问题?"                           │
@@ -95,20 +98,27 @@
 ┌───────────────────────────────────────────────────────────────┐
 │                       Memory 模块                              │
 ├───────────────────────────────────────────────────────────────┤
+│  触发条件: Verdict=supported 或 contradicted                  │
 │  输入: Question + Plan + Docs + 当前Memory                    │
-│                                                                        │
-│  任务: LLM调用进行知识压缩 + 证据绑定                           │
-│  输出: 精炼的路径知识（与Q相关的、已验证的路径）                  │
-│  存储: 追加到Golden Evidence Memory中                          │
-│                                                                        │
-│  [supported情况]                                                  │
-│    输入: 正确Plan + 相关Docs + 当前Memory                       │
-│    任务: 从Docs中提取证据，绑定到Plan，压缩精炼                   │
-│                                                                        │
-│  [contradicted情况]                                               │
-│    输入: 错误Plan + 相关Docs + 当前Memory                       │
-│    任务: 参考错误Plan的逻辑方向 + Docs + 已有路径                │
-│          推断正确的Plan并进行精炼                                 │
+│  核心: LLM调用进行知识压缩 + 证据绑定                         │
+│  输出: 路径级别的精炼知识（可直接用于后续推理）                │
+│  存储: 追加到Memory中                                               │
+│                                                                       │
+│  [示例]                                                         │
+│  原始Plan: The director is Mart Crowley                        │
+│  Docs验证: 实际导演是Joe Mantello                               │
+│  Memory精炼:                                                    │
+│    第一跳推理: The director of "The Boys In The Band" (2020)  │
+│                is Joe Mantello.                                │
+│                                                                       │
+│  [supported情况]                                               │
+│    输入: 正确Plan + 相关Docs + 当前Memory                      │
+│    任务: 从Docs中提取证据，绑定到Plan，压缩精炼                │
+│                                                                       │
+│  [contradicted情况]                                            │
+│    输入: 错误Plan + 相关Docs + 当前Memory                      │
+│    任务: 参考错误Plan的逻辑方向 + Docs + 已有路径             │
+│          推断正确的Plan并进行精炼                               │
 └───────────────────────────────────────────────────────────────┘
                                 │
                                 │ 返回迭代开始
@@ -140,7 +150,7 @@
 
 ### 4.1 Planner模块
 
-**输入**: Question + Golden Evidence Memory
+**输入**: Question + Memory
 
 **Step 1: Judge (LLM调用)**
 - 功能: 判断当前记忆是否足以回答问题
@@ -176,13 +186,26 @@
 - 调用LLM进行知识压缩和证据绑定
 - 输出精炼后的路径知识
 
-**两种情况**:
-| 情况 | Memory LLM任务 |
-|------|----------------|
-| supported | 从Docs中提取证据，绑定到Plan，压缩精炼为与Q相关的路径知识 |
-| contradicted | 参考错误Plan的逻辑方向 + Docs + 已有路径，推断正确的Plan并进行精炼 |
+**Memory精炼的目标**:
+将Plan + Docs转化为**可直接用于后续推理的路径级别精炼知识**，格式如：
+```
+[路径级别精炼知识]
+第一跳推理: The director of "The Boys In The Band" (2020) is Joe Mantello.
+```
 
-**存储**: 累积到Golden Evidence Memory中
+**两种情况**:
+
+| 情况 | 输入 | Memory LLM任务 | 输出示例 |
+|------|------|----------------|----------|
+| supported | 正确Plan + 相关Docs + 当前Memory | 从Docs中提取证据，绑定到Plan，压缩精炼为与Q相关的路径知识 | 第一跳推理: The director is Joe Mantello. |
+| contradicted | 错误Plan + 相关Docs + 当前Memory | 参考错误Plan的逻辑方向 + Docs + 已有路径，推断正确的Plan并进行精炼 | 第一跳推理: The director is Joe Mantello. (而非原假设的Mart Crowley) |
+
+**关键特性**:
+- 精炼后的记忆是**可直接作为推理上下文的路径知识**，不是原始假设的简单存储
+- Planner能够识别Memory中已有的路径信息，从该路径的下一跳继续推理
+- 不一定是推理起点，也可能是中间推理结果
+
+**存储**: 累积到Memory中
 
 ### 4.4 Generate模块
 
@@ -233,4 +256,4 @@ Memory中存储的全是经过验证的正确路径，verdict信息冗余，无�
 | Retriever | 单次检索 | 支持Rewrite优化检索词 |
 | Reasoner | Judge+Plan合二为一 | Judge+Plan拆分为两次LLM调用 |
 | Generator | 独立模块 | 从Planner中拆分出 |
-| Memory | 两个队列 | 统一记忆，统一压缩 |
+| Memory | 两个队列（分离设计） | 统一记忆：既是Evidence又是路径 |
