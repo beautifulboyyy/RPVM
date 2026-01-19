@@ -159,8 +159,10 @@ class RPVMPipeline(BasicPipeline):
                 })
                 break
 
-            # Step 1b: Plan生成 - 仅在Judge=NO时生成所有需要的plans
-            plans = self._planner_plan(question, memory)
+            # Step 1b: Plan生成 - 仅在Judge=NO时生成plans
+            # 首次迭代生成多个plans，后续迭代仅生成单个plan
+            is_first_iteration = (iter_idx == 0)
+            plans = self._planner_plan(question, memory, is_first_iteration)
 
             # 检查是否有有效的plans
             valid_plans = [p for p in plans if p and not p.startswith("Unable to parse")]
@@ -190,17 +192,22 @@ class RPVMPipeline(BasicPipeline):
             short_circuit_due_to_contradiction = False
 
             for plan_idx, plan in enumerate(valid_plans):
-                # Rewrite + Retrieve + Verify
-                verdict, corrected_plan, evidence, retrievals = self._verify_plan(
+                # Retrieve + Verify (无Rewrite)
+                verdict, corrected_hypothesis, evidence, retrievals = self._verify_plan(
                     plan, question, memory
                 )
                 total_retrievals += retrievals
 
+                # 从 Q|H 对中提取 sub_question 和原始 hypothesis
+                sub_question, original_hypothesis = self._parse_question_hypothesis(plan)
+
                 verification_info = {
                     'plan_index': plan_idx + 1,
-                    'original_plan': plan,
+                    'original_plan': plan,  # 保留原始 Q|H 对
+                    'sub_question': sub_question,
+                    'original_hypothesis': original_hypothesis,
                     'verdict': verdict,
-                    'corrected_plan': corrected_plan,
+                    'corrected_hypothesis': corrected_hypothesis,
                     'evidence': evidence,
                     'retrievals': retrievals
                 }
@@ -209,16 +216,12 @@ class RPVMPipeline(BasicPipeline):
                 # ==================== Step 3: Memory ====================
                 # 仅在verdict=supported或contradicted时触发
                 if verdict in ["supported", "contradicted"]:
-                    # 获取文档文本用于Memory模块
-                    docs_text = self._get_docs_text_for_memory(plan, question, memory)
-
-                    # 调用Memory模块进行知识压缩+证据绑定
+                    # 直接使用Verifier的 corrected_hypothesis 和 evidence
                     refined_memory = self._update_memory(
-                        question=question,
-                        plan=corrected_plan,
-                        docs_text=docs_text,
-                        memory=memory,
-                        verdict=verdict
+                        sub_question=sub_question,
+                        hypothesis=corrected_hypothesis,
+                        evidence=evidence,
+                        memory=memory
                     )
 
                     memory = refined_memory
@@ -283,14 +286,23 @@ class RPVMPipeline(BasicPipeline):
             return "YES"
         return "NO"
 
-    def _planner_plan(self, question: str, memory: str) -> List[str]:
+    def _planner_plan(self, question: str, memory: str, is_first_iteration: bool = True) -> List[str]:
         """
-        Planner Plan: 生成所有需要查询的子问题
+        Planner Plan: 生成需要查询的子问题
+
+        Args:
+            question: 原始问题
+            memory: 当前记忆
+            is_first_iteration: 是否是首次迭代
+                - True: 生成多个plans覆盖问题的各个方面
+                - False: 仅生成下一个需要验证的单个问题
 
         Returns:
             plan列表 或 包含解析失败标识的列表
         """
-        system_prompt, user_prompt = self.prompt_loader.get_planner_plan_prompt(question, memory)
+        system_prompt, user_prompt = self.prompt_loader.get_planner_plan_prompt(
+            question, memory, is_first_iteration=is_first_iteration
+        )
 
         response = self._call_generator(
             system_prompt=system_prompt,
@@ -304,7 +316,7 @@ class RPVMPipeline(BasicPipeline):
         return plans if plans else ["Unable to parse plans"]
 
     def _parse_plans(self, response: str) -> List[str]:
-        """从LLM响应中解析多个plan"""
+        """从LLM响应中解析多个 (Question|Hypothesis) 对"""
         plans = []
         lines = response.strip().split('\n')
 
@@ -314,30 +326,50 @@ class RPVMPipeline(BasicPipeline):
             if not line:
                 continue
 
-            # 匹配 "plan1: xxx" 格式
+            # 匹配 "plan1: xxx | xxx" 格式 (Q|H对)
             match = re.match(r'^plan\d+[:\s]+(.+)$', line, re.IGNORECASE)
             if match:
                 plan_text = match.group(1).strip()
-                if plan_text:
+                if plan_text and '|' in plan_text:
                     plans.append(plan_text)
                 continue
 
-            # 匹配 "1. xxx" 或 "1) xxx" 格式
+            # 匹配 "1. xxx | xxx" 或 "1) xxx | xxx" 格式
             match = re.match(r'^(\d+)[\.\)\s]+(.+)$', line)
             if match:
                 plan_text = match.group(2).strip()
-                if plan_text:
+                if plan_text and '|' in plan_text:
                     plans.append(plan_text)
                 continue
 
-            # 匹配 "- " 开头的列表格式
+            # 匹配 "- xxx | xxx" 格式
             match = re.match(r'^-\s+(.+)$', line)
             if match:
                 plan_text = match.group(1).strip()
-                if plan_text:
+                if plan_text and '|' in plan_text:
                     plans.append(plan_text)
 
         return plans
+
+    def _parse_question_hypothesis(self, plan: str) -> Tuple[str, str]:
+        """
+        从 Q|H 格式中解析出 Question 和 Hypothesis
+
+        Args:
+            plan: "What is X? | hypothesis answer"
+
+        Returns:
+            (question, hypothesis)
+        """
+        if '|' not in plan:
+            # 如果没有 | 分隔符，整个作为 hypothesis
+            return "", plan
+
+        parts = plan.split('|', 1)
+        question = parts[0].strip()
+        hypothesis = parts[1].strip()
+
+        return question, hypothesis
 
     def _parse_single_plan(self, response: str) -> str:
         """从LLM响应中解析单个plan（已废弃，保留兼容）"""
@@ -348,35 +380,42 @@ class RPVMPipeline(BasicPipeline):
 
     def _verify_plan(self, plan: str, question: str, memory: str) -> Tuple[str, str, str, int]:
         """
-        Plan Verifier: 验证单个plan
+        Plan Verifier: 验证单个 (Question|Hypothesis) 对
 
-        流程:
-        1. Rewrite: 从 Q 和 Plan 提取权威锚点 + 关系，生成检索词
-        2. Retrieve: 基于优化后的检索词召回文档
-        3. Verify: 将 Plan 与召回文档对比，输出判定结果
+        新流程（移除Rewrite）:
+        1. 从 Q|H 对中提取 Question
+        2. Retrieve: 直接用 Question 召回文档
+        3. Verify: 将 Hypothesis 与召回文档对比，输出判定结果
 
         Returns:
-            (verdict, corrected_plan, evidence, num_retrievals)
+            (verdict, corrected_hypothesis, evidence, num_retrievals)
             verdict: "supported" | "contradicted" | "insufficient"
         """
-        # Step 1: Rewrite - 生成检索词（问题2修复：传入memory）
-        query = self._extract_verification_query(question, plan, memory)
+        # Step 0: 从 Q|H 对中提取 Question 和 Hypothesis
+        sub_question, hypothesis = self._parse_question_hypothesis(plan)
 
-        # Step 2: Retrieve - 检索文档
+        # 如果解析失败，使用原始 plan 作为 hypothesis
+        if not sub_question:
+            sub_question = plan
+            hypothesis = ""
+
+        # Step 1: Retrieve - 直接用 Question 检索（移除Rewrite）
         retrievals_count = 0
-        retrieved_docs = self.retriever.batch_search([query], num=self.retrieval_topk)
+        retrieved_docs = self.retriever.batch_search([sub_question], num=self.retrieval_topk)
         retrievals_count += 1
 
         docs = retrieved_docs[0] if retrieved_docs and retrieved_docs[0] else []
 
         # 如果没有检索到文档
         if not docs:
-            return "insufficient", plan, "No relevant documents found", retrievals_count
+            return "insufficient", hypothesis, "No relevant documents found", retrievals_count
 
-        # Step 3: Verify - 验证plan
-        verdict, corrected_plan, evidence = self._verify_with_docs(plan, docs, question, memory)
+        # Step 2: Verify - 验证 Hypothesis（传入 sub_question 和 hypothesis）
+        verdict, corrected_hypothesis, evidence = self._verify_with_docs(
+            sub_question, hypothesis, docs, question, memory
+        )
 
-        return verdict, corrected_plan, evidence, retrievals_count
+        return verdict, corrected_hypothesis, evidence, retrievals_count
 
     def _extract_verification_query(self, question: str, plan: str, memory: str = "") -> str:
         """
@@ -441,16 +480,30 @@ class RPVMPipeline(BasicPipeline):
         # 最终fallback
         return question
 
-    def _verify_with_docs(self, plan: str, docs: List[Dict], question: str, memory: str) -> Tuple[str, str, str]:
+    def _verify_with_docs(self, sub_question: str, hypothesis: str, docs: List[Dict], question: str, memory: str) -> Tuple[str, str, str]:
         """
-        基于检索到的文档验证plan
+        基于检索到的文档验证 hypothesis
+
+        Args:
+            sub_question: 子问题
+            hypothesis: 假设答案
+            docs: 检索到的文档
+            question: 原始问题
+            memory: 当前记忆
+
+        Returns:
+            (verdict, corrected_hypothesis, evidence)
         """
         docs_text = "\n\n".join([
             f"Document {i+1}: {doc.get('contents', doc.get('text', ''))}"
             for i, doc in enumerate(docs[:5])
         ])
 
-        system_prompt, user_prompt = self.prompt_loader.get_verifier_prompt(plan, docs_text)
+        system_prompt, user_prompt = self.prompt_loader.get_verifier_prompt(
+            sub_question=sub_question,
+            hypothesis=hypothesis,
+            docs_text=docs_text
+        )
 
         response = self._call_generator(
             system_prompt=system_prompt,
@@ -459,14 +512,14 @@ class RPVMPipeline(BasicPipeline):
             max_tokens=300
         )
 
-        verdict, corrected_plan, evidence = self._parse_verification_response(response, plan)
+        verdict, corrected_hypothesis, evidence = self._parse_verification_response(response, hypothesis)
 
-        return verdict, corrected_plan, evidence
+        return verdict, corrected_hypothesis, evidence
 
-    def _parse_verification_response(self, response: str, original_plan: str) -> Tuple[str, str, str]:
+    def _parse_verification_response(self, response: str, original_hypothesis: str) -> Tuple[str, str, str]:
         """解析验证响应"""
         verdict = "insufficient"
-        corrected_plan = original_plan
+        corrected_hypothesis = original_hypothesis
         evidence = ""
 
         lines = response.strip().split('\n')
@@ -480,23 +533,37 @@ class RPVMPipeline(BasicPipeline):
                     verdict = "contradicted"
                 elif 'insufficient' in verdict_text:
                     verdict = "insufficient"
-            elif line.lower().startswith('corrected statement:') or line.lower().startswith('corrected:'):
-                corrected_plan = line.split(':', 1)[1].strip()
+            elif line.lower().startswith('corrected answer:') or line.lower().startswith('corrected:'):
+                corrected_hypothesis = line.split(':', 1)[1].strip()
                 # 去除首尾的单引号或双引号
-                if (corrected_plan.startswith("'") and corrected_plan.endswith("'")) or \
-                   (corrected_plan.startswith('"') and corrected_plan.endswith('"')):
-                    corrected_plan = corrected_plan[1:-1].strip()
+                if (corrected_hypothesis.startswith("'") and corrected_hypothesis.endswith("'")) or \
+                   (corrected_hypothesis.startswith('"') and corrected_hypothesis.endswith('"')):
+                    corrected_hypothesis = corrected_hypothesis[1:-1].strip()
             elif line.lower().startswith('evidence:'):
                 evidence = line.split(':', 1)[1].strip()
 
-        return verdict, corrected_plan if corrected_plan else original_plan, evidence
+        return verdict, corrected_hypothesis if corrected_hypothesis else original_hypothesis, evidence
 
     def _get_docs_text_for_memory(self, plan: str, question: str, memory: str) -> str:
         """
         重新检索获取文档文本用于Memory模块
+
+        Args:
+            plan: Q|H 格式的 plan
+            question: 原始问题
+            memory: 当前记忆
+
+        Returns:
+            文档文本
         """
-        query = self._extract_verification_query(question, plan, memory)
-        retrieved_docs = self.retriever.batch_search([query], num=self.retrieval_topk)
+        # 从 Q|H 对中提取 Question
+        sub_question, _ = self._parse_question_hypothesis(plan)
+
+        # 直接用 Question 检索（移除rewrite）
+        if not sub_question:
+            sub_question = question
+
+        retrieved_docs = self.retriever.batch_search([sub_question], num=self.retrieval_topk)
         docs = retrieved_docs[0] if retrieved_docs and retrieved_docs[0] else []
 
         if not docs:
@@ -510,31 +577,21 @@ class RPVMPipeline(BasicPipeline):
 
     # ==================== Memory Module ====================
 
-    def _update_memory(self, question: str, plan: str, docs_text: str, memory: str, verdict: str) -> str:
+    def _update_memory(self, sub_question: str, hypothesis: str, evidence: str, memory: str) -> str:
         """
-        Memory模块: 知识压缩 + 证据绑定
+        Memory模块: 直接格式化输出（复用Verifier的输出）
 
         仅在verdict=supported或contradicted时触发
-        调用LLM进行知识压缩和证据绑定，输出精炼后的路径知识
+        直接使用Verifier的 corrected_hypothesis 和 evidence，不再调用LLM
+
+        Args:
+            sub_question: 子问题
+            hypothesis: 假设答案（已验证或已纠正）- 来自Verifier
+            evidence: 证据 - 来自Verifier
+            memory: 当前记忆
         """
-        system_prompt, user_prompt = self.prompt_loader.get_memory_prompt(
-            question=question,
-            plan=plan,
-            docs_text=docs_text,
-            memory=memory,
-            verdict=verdict
-        )
-
-        refined_memory = self._call_generator(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            temperature=0.3,
-            max_tokens=256
-        )
-
-        # 清理输出
-        refined_memory = refined_memory.strip()
-        refined_memory = re.sub(r'^\[Refined Path-Level Knowledge\]:\s*', '', refined_memory)
+        # 格式化输出: Q: | A: | Evidence:
+        refined_memory = f"Q: {sub_question} | A: {hypothesis} | Evidence: {evidence}"
 
         # 追加到已有记忆
         if memory.strip():

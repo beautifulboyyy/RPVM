@@ -49,9 +49,11 @@ class PromptLoader:
                 # Planner - Judge (Step 1)
                 'planner_judge_system': 'planner_judge_system.md',
                 'planner_judge_user': 'planner_judge_user.md',
-                # Planner - Plan (Step 2)
+                # Planner - Plan (Step 2) - First iteration
                 'planner_plan_system': 'planner_plan_system.md',
-                'planner_plan_user': 'planner_plan_user.md',
+                'planner_plan_first_user': 'planner_plan_first_user.md',
+                # Planner - Plan (Step 2) - Subsequent iterations
+                'planner_plan_next_user': 'planner_plan_next_user.md',
                 # Verifier - Query Rewrite
                 'verifier_query_system': 'verifier_query_system.md',
                 'verifier_query_user': 'verifier_query_user.md',
@@ -131,16 +133,46 @@ class PromptLoader:
 
     # ==================== Planner - Plan ====================
 
-    def get_planner_plan_prompt(self, question: str, memory: str) -> tuple:
+    def get_planner_plan_prompt(self, question: str, memory: str, is_first_iteration: bool = True) -> tuple:
         """
         获取Planner Plan的system和user prompt
         Step 2: 生成下一步需要查询的子问题（仅在Judge=NO时调用）
+
+        Args:
+            question: 原始问题
+            memory: 当前记忆
+            is_first_iteration: 是否是首次迭代（首次生成多个plan，后续生成单个plan）
+
+        Returns:
+            (system_prompt, user_prompt)
+        """
+        if is_first_iteration:
+            return self.get_planner_plan_prompt_first(question, memory)
+        else:
+            return self.get_planner_plan_prompt_next(question, memory)
+
+    def get_planner_plan_prompt_first(self, question: str, memory: str) -> tuple:
+        """
+        获取Planner Plan的system和user prompt（首次迭代）
+        生成覆盖问题所有方面的多个plans
 
         Returns:
             (system_prompt, user_prompt)
         """
         system_prompt = self.get('planner_plan_system')
-        user_prompt = self.get('planner_plan_user', question=question, memory=memory)
+        user_prompt = self.get('planner_plan_first_user', question=question, memory=memory)
+        return system_prompt, user_prompt
+
+    def get_planner_plan_prompt_next(self, question: str, memory: str) -> tuple:
+        """
+        获取Planner Plan的system和user prompt（后续迭代）
+        仅生成下一个需要验证的单个问题
+
+        Returns:
+            (system_prompt, user_prompt)
+        """
+        system_prompt = self.get('planner_plan_system')
+        user_prompt = self.get('planner_plan_next_user', question=question, memory=memory)
         return system_prompt, user_prompt
 
     # ==================== Legacy Planner (OpenAI style) ====================
@@ -173,15 +205,20 @@ class PromptLoader:
 
     # ==================== Verifier ====================
 
-    def get_verifier_prompt(self, plan: str, docs_text: str) -> tuple:
+    def get_verifier_prompt(self, sub_question: str, hypothesis: str, docs_text: str) -> tuple:
         """
-        获取Verifier的system和user prompt
+        获取Verifier的system和user prompt（验证 Hypothesis）
+
+        Args:
+            sub_question: 子问题
+            hypothesis: 假设答案
+            docs_text: 检索到的文档文本
 
         Returns:
             (system_prompt, user_prompt)
         """
         system_prompt = self.get('verifier_system')
-        user_prompt = self.get('verifier_user', plan=plan, docs_text=docs_text)
+        user_prompt = self.get('verifier_user', sub_question=sub_question, hypothesis=hypothesis, docs_text=docs_text)
         return system_prompt, user_prompt
 
     def get_verifier_query_prompt(self, question: str, plan: str, memory: str = "") -> tuple:
@@ -203,14 +240,15 @@ class PromptLoader:
 
     # ==================== Memory ====================
 
-    def get_memory_prompt(self, question: str, plan: str, docs_text: str, memory: str, verdict: str) -> tuple:
+    def get_memory_prompt(self, question: str, sub_question: str, hypothesis: str, docs_text: str, memory: str, verdict: str) -> tuple:
         """
         获取Memory模块的system和user prompt
         统一处理supported和contradicted两种情况
 
         Args:
             question: 原始问题
-            plan: 当前plan
+            sub_question: 子问题 (Q|H 对中的 Question)
+            hypothesis: 假设答案 (Q|H 对中的 Hypothesis)
             docs_text: 检索到的文档
             memory: 已有记忆
             verdict: 验证结果 ("supported" | "contradicted")
@@ -223,13 +261,15 @@ class PromptLoader:
         if verdict == "supported":
             user_prompt = self.get('memory_user_supported',
                                    question=question,
-                                   plan=plan,
+                                   sub_question=sub_question,
+                                   hypothesis=hypothesis,
                                    docs_text=docs_text,
                                    memory=memory)
         elif verdict == "contradicted":
             user_prompt = self.get('memory_user_contradicted',
                                    question=question,
-                                   plan=plan,
+                                   sub_question=sub_question,
+                                   hypothesis=hypothesis,
                                    docs_text=docs_text,
                                    memory=memory)
         else:
