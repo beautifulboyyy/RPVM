@@ -75,18 +75,40 @@ class RPVMPipeline(BasicPipeline):
                 max_tokens=max_tokens
             )[0]
         else:
-            # 本地 HF 模型：使用手动构建的 chat template
-            full_prompt = f"""<|im_start|>system
+            # 本地 HF 模型：检测是否为 Llama 系列，使用 apply_chat_template
+            model_name = self.generator.model_name if hasattr(self.generator, 'model_name') else ""
+
+            if "llama" in model_name.lower():
+                # Llama 3 系列：使用 apply_chat_template
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ]
+                # 使用 tokenizer 的 chat template
+                full_prompt = self.generator.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True
+                )
+                response = self.generator.generate(
+                    [full_prompt],
+                    temperature=temperature,
+                    max_new_tokens=max_tokens,
+                    stop=["<|eot_id|>"]
+                )[0]
+            else:
+                # 其他模型（如 Qwen）：使用手动构建的 chat template
+                full_prompt = f"""<|im_start|>system
 {system_prompt}<|im_end|>
 <|im_start|>user
 {user_prompt}<|im_end|>
 <|im_start|>assistant
 """
-            response = self.generator.generate(
-                [full_prompt],
-                temperature=temperature,
-                max_new_tokens=max_tokens
-            )[0]
+                response = self.generator.generate(
+                    [full_prompt],
+                    temperature=temperature,
+                    max_new_tokens=max_tokens
+                )[0]
 
         return response.strip()
 
