@@ -46,7 +46,7 @@ rpvm_config:
   retrieval_topk: 2  # 每次检索返回的文档数
 
   # Prompt风格设置
-  prompt_dir: "GPT35"  # 使用重构后的GPT35风格prompts
+  prompt_dir: "llama3"  # 使用重构后的GPT35风格prompts
 
   # Memory设置
   memory_max_tokens: 3000  # 记忆的最大token数

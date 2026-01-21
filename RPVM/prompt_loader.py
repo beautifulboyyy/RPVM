@@ -37,7 +37,12 @@ class PromptLoader:
         else:
             # 相对路径，相对于prompts目录
             self.prompts_dir = os.path.join(prompts_base_dir, prompts_dir)
-            self.prompt_style = prompts_dir
+            # 如果目录名是 GPT35 或 openai，使用该风格；否则使用 GPT35 风格（重构版）
+            if prompts_dir in ('GPT35', 'openai'):
+                self.prompt_style = prompts_dir
+            else:
+                # 自定义风格目录（如 llama3），使用 GPT35 文件结构
+                self.prompt_style = 'GPT35'
 
         self._prompts = {}
         self._load_all_prompts()
